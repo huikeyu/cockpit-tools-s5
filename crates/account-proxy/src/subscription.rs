@@ -1,5 +1,5 @@
 //! Offline parsing only. The caller fetches the subscription without logging its URL or body.
-use super::parse;
+use super::{parse, percent_encode_userinfo_component};
 use base64::{engine::general_purpose::{STANDARD, URL_SAFE}, Engine};
 use serde_yaml::Value;
 use std::collections::HashSet;
@@ -16,7 +16,7 @@ pub struct SubscriptionParseResult {
 }
 
 fn component(value: &str) -> String {
-    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+    percent_encode_userinfo_component(value)
 }
 
 fn host(value: &str) -> String {
@@ -214,5 +214,26 @@ proxies:
         assert_eq!(result.nodes.len(), 2);
         assert_eq!(result.skipped, 1);
         assert!(result.nodes[0].normalized_uri.contains("insecure=1"));
+    }
+    #[test]
+    fn imports_clash_yaml_socks5_username_with_spaces() {
+        let yaml = r#"
+proxies:
+  - name: 1024-US-NewYork
+    type: socks5
+    server: us.1024proxy.io
+    port: 3000
+    username: "e4uu743633-region-US-st-New York-city-New York City-sid-c5fVZ2BT-t-120"
+    password: synthetic-password
+"#;
+        let result = parse_subscription(yaml).unwrap();
+        assert_eq!(result.nodes.len(), 1);
+        let spec = parse(&result.nodes[0].normalized_uri).unwrap();
+        let server = &spec.xray_config(32200)["outbounds"][0]["settings"]["servers"][0];
+        assert_eq!(
+            server["users"][0]["user"],
+            "e4uu743633-region-US-st-New York-city-New York City-sid-c5fVZ2BT-t-120"
+        );
+        assert_eq!(server["users"][0]["pass"], "synthetic-password");
     }
 }
