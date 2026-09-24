@@ -71,7 +71,22 @@ test('all account cards share one remote IP switch and show inventory line names
   assert.ok(panel.includes('proxy?.label ||'));
   assert.ok(panel.includes('showEndpoint ? remoteHost : maskEndpoint(remoteHost)'));
   const backend = read('src-tauri/src/modules/account_proxy.rs');
-  assert.ok(backend.includes('label: inventory_label.or_else'));
+  assert.ok(backend.includes('inventory_label.or_else'));
+  assert.ok(backend.includes('binding.as_ref().and_then(|value| value.group_label.clone())'));
+});
+test('proxy manager hot-switches accounts and keeps failed groups editable', () => {
+  const backend = read('src-tauri/src/modules/account_proxy.rs');
+  const commands = read('src-tauri/src/commands/account_proxy.rs');
+  const manager = read('src/components/codex/CodexProxyManager.tsx');
+  assert.ok(backend.includes('fn load_binding_raw('));
+  assert.ok(backend.includes('let old_binding = load_binding_raw(id)?'));
+  assert.ok(backend.includes('let test_port = allocate_port()?'));
+  assert.ok(backend.includes('refresh_inventory_bound_runtimes(&affected)'));
+  assert.ok(!commands.includes('ensure_account_proxy_edit_safe'));
+  assert.ok(manager.includes('codex_move_proxy_inventory_entry'));
+  assert.ok(manager.includes('codex_get_proxy_group_bindings'));
+  assert.ok(manager.includes('codex_save_account_proxy'));
+  assert.ok(manager.includes('const shown = routes.slice(start, end)'));
 });
 test('HY2/TUIC use bundled sing-box and subscription import requires an explicit network choice', () => {
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));

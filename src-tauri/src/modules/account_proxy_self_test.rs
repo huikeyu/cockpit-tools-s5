@@ -86,6 +86,7 @@ pub fn self_test() -> Result<serde_json::Value, String> {
     let _cleanup = Cleanup;
     let a = server("ACCOUNT_A")?;
     let b = server("ACCOUNT_B")?;
+    let c = server("ACCOUNT_C")?;
     let direct = server("DIRECT_LEAK")?;
     let a_uri = format!("http://127.0.0.1:{}", a.port);
     if client("selftest-unbound", Duration::from_secs(1)).is_ok()
@@ -282,6 +283,40 @@ pub fn self_test() -> Result<serde_json::Value, String> {
             .map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
     })?;
     if backup_response != "ACCOUNT_B" { return Err("Failover request missed backup proxy".into()); }
+    let stable_port = status("selftest-group")?.local_port;
+    inventory_delete(&first_item.id)?;
+    let backup_id = inventory_list()?.into_iter()
+        .find(|item| item.server_port == b.port && item.group_label == "测试接管组")
+        .ok_or("Backup inventory route missing")?.id;
+    inventory_delete(&backup_id)?;
+    let broken = status("selftest-group")?;
+    if broken.group_label.as_deref() != Some("测试接管组")
+        || broken.blocked_reason.is_none() || broken.route_count != 0
+        || endpoint("selftest-group").is_ok() {
+        return Err("Empty group did not remain editable and fail closed".into());
+    }
+    let replacement = inventory_save(None, "恢复线路", "恢复线路组", &format!("http://127.0.0.1:{}", c.port))?
+        .into_iter().find(|item| item.server_port == c.port).ok_or("Replacement route missing")?;
+    let recovered = save("selftest-group", Some(&format!("inventory://{}", replacement.id)))?;
+    if recovered.group_label.as_deref() != Some("恢复线路组")
+        || recovered.local_port != stable_port || !recovered.running || recovered.blocked_reason.is_some() {
+        return Err("Failed group could not hot-switch to a valid group on the stable local port".into());
+    }
+    let recovered_response = runtime.block_on(async {
+        client("selftest-group", Duration::from_secs(3))?.get(&url).send().await
+            .map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
+    })?;
+    if recovered_response != "ACCOUNT_C" { return Err("Recovered route did not use the replacement network".into()); }
+    let second_group = inventory_save(None, "再次切换", "热切换组", &format!("http://127.0.0.1:{}", b.port))?
+        .into_iter().find(|item| item.server_port == b.port).ok_or("Second group route missing")?;
+    save("selftest-group", Some(&format!("inventory://{}", second_group.id)))?;
+    if status("selftest-group")?.local_port != stable_port { return Err("Live switch changed sidecar proxy URL".into()); }
+    let live_switched_response = runtime.block_on(async {
+        client("selftest-group", Duration::from_secs(3))?.get(&url).send().await
+            .map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
+    })?;
+    if live_switched_response != "ACCOUNT_B" { return Err("Running account did not hot-switch networks".into()); }
+    if direct.hits.load(Ordering::SeqCst) != 0 { return Err("Hot switching leaked a direct request".into()); }
     std::env::remove_var("COCKPIT_PROXY_SELFTEST_PROBE_URL");
     save("selftest-a", None)?;
     if endpoint("selftest-a")?.is_some() || profile_proxy(&isolation_dir("selftest-a")?).is_ok() {
@@ -289,6 +324,6 @@ pub fn self_test() -> Result<serde_json::Value, String> {
     }
     shutdown();
     Ok(
-        serde_json::json!({"passed": true, "checks": ["encrypted bindings", "two distinct listeners", "concurrent account routes", "pending auth fails closed", "pending auth proxy locked", "pending auth request uses account A exit", "pending proxy promoted to account binding", "no direct fallback", "inventory group binds two routes", "failed primary switches to backup", "backup route serves the request", "occupied port blocks", "stable restart", "independent empty profiles", "idempotent instance creation", "invalid update preserves binding", "system default client profile preserved", "default API Service client starts without an account proxy", "Reality Vision core accepts config", "bundled sing-box validates and starts HY2 and TUIC listeners", "unbound isolation blocks launch", "child cleanup"], "accountARequests": a.hits.load(Ordering::SeqCst), "accountBRequests": b.hits.load(Ordering::SeqCst), "directRequests": direct.hits.load(Ordering::SeqCst)}),
+        serde_json::json!({"passed": true, "checks": ["encrypted bindings", "two distinct listeners", "concurrent account routes", "pending auth fails closed", "pending auth proxy locked", "pending auth request uses account A exit", "pending proxy promoted to account binding", "no direct fallback", "inventory group binds two routes", "failed primary switches to backup", "backup route serves the request", "empty group stays editable and blocks direct", "failed group recovers on a stable local port", "running account hot-switches groups", "hot switch has no direct requests", "occupied port blocks", "stable restart", "independent empty profiles", "idempotent instance creation", "invalid update preserves binding", "system default client profile preserved", "default API Service client starts without an account proxy", "Reality Vision core accepts config", "bundled sing-box validates and starts HY2 and TUIC listeners", "unbound isolation blocks launch", "child cleanup"], "accountARequests": a.hits.load(Ordering::SeqCst), "accountBRequests": b.hits.load(Ordering::SeqCst), "directRequests": direct.hits.load(Ordering::SeqCst)}),
     )
 }

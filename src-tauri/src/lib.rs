@@ -800,8 +800,10 @@ pub fn run() {
             commands::account_proxy::codex_set_pending_auth_proxy,
             commands::account_proxy::codex_test_pending_auth_proxy,
             commands::account_proxy::codex_get_proxy_inventory,
+            commands::account_proxy::codex_get_proxy_group_bindings,
             commands::account_proxy::codex_save_proxy_inventory_entry,
             commands::account_proxy::codex_delete_proxy_inventory_entry,
+            commands::account_proxy::codex_move_proxy_inventory_entry,
             commands::account_proxy::codex_import_proxy_subscription,
             // Account Commands
             commands::account::list_accounts,

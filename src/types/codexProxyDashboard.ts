@@ -19,6 +19,15 @@ export interface CodexProxyStatus {
   routeCount: number;
   activeRouteIndex: number;
   failoverCount: number;
+  blockedReason: string | null;
+}
+
+export interface CodexProxyGroupBinding {
+  accountId: string;
+  groupId: string | null;
+  groupLabel: string | null;
+  running: boolean;
+  blockedReason: string | null;
 }
 
 export interface CodexProxyInventoryItem {

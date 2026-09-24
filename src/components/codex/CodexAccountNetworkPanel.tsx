@@ -97,6 +97,7 @@ export function CodexAccountNetworkPanel({ account, inApiService, apiServiceRunn
   const { level: heatLevel, strength: heatStrength } = computeCodexRequestHeat(dashboard?.recentRequests ?? [], now);
   const recent = Boolean(latest && now - latest.timestamp < 12_000);
   const tone = !proxy?.enabled ? 'unbound'
+    : proxy.blockedReason ? 'blocked'
     : !inApiService ? 'saved'
       : !apiServiceRunning ? 'waiting'
         : proxy.running ? 'running' : 'blocked';
@@ -128,7 +129,7 @@ export function CodexAccountNetworkPanel({ account, inApiService, apiServiceRunn
       <div className="codex-proxy-network-header">
         <span className="codex-proxy-network-icon"><Route size={16} /></span>
         <div className="codex-proxy-network-heading">
-          <span title={proxy?.groupLabel || undefined}>独立出口{proxy?.routeCount ? ` · ${proxy.routeCount} 线` : ''}</span>
+          <span title={proxy?.groupLabel || undefined}>独立网络{proxy?.routeCount ? ` · ${proxy.routeCount} 线` : ''}</span>
           <strong title={routeLabel}>{routeLabel}</strong>
         </div>
         <span className={`codex-proxy-network-state is-${tone}`}><i />{toneText}</span>
@@ -145,7 +146,7 @@ export function CodexAccountNetworkPanel({ account, inApiService, apiServiceRunn
         <div className="codex-proxy-network-actions"><button ref={triggerRef} type="button" onClick={() => setDetailsOpen(true)}>查看链路</button><CodexAccountProxyButton account={account} compact /></div>
         {latest && <strong className="codex-proxy-model-mark" title={latest.model}>{latest.model || '模型请求'}</strong>}
       </div>
-      {loadError && <p className="codex-proxy-network-error"><CircleAlert size={12} />{loadError}</p>}
+      {(loadError || proxy?.blockedReason) && <p className="codex-proxy-network-error"><CircleAlert size={12} />{loadError || proxy?.blockedReason}</p>}
     </section>
     {detailsOpen && createPortal(
       <div className="codex-proxy-chain-overlay" onClick={(event) => { if (event.target === event.currentTarget) setDetailsOpen(false); }}>

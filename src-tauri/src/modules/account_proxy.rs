@@ -119,6 +119,17 @@ pub struct ProxyStatus {
     pub route_count: usize,
     pub active_route_index: usize,
     pub failover_count: u64,
+    pub blocked_reason: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyGroupBinding {
+    pub account_id: String,
+    pub group_id: Option<String>,
+    pub group_label: Option<String>,
+    pub running: bool,
+    pub blocked_reason: Option<String>,
 }
 
 struct Runtime {
@@ -184,12 +195,36 @@ fn save_inventory(entries: &[ProxyInventoryEntry]) -> Result<(), String> {
         .map_err(|_| "保存代理库存失败".into())
 }
 
-fn refresh_inventory_bound_runtimes() {
+fn refresh_inventory_bound_runtimes(affected_groups: &HashSet<String>) {
+    if affected_groups.is_empty() { return; }
     let ids = GROUP_MONITORED_IDS.lock().map(|value| value.iter().cloned().collect::<Vec<_>>())
         .unwrap_or_default();
+    let mut restart = Vec::new();
     for id in ids {
-        if let Ok(mut runtimes) = RUNTIMES.lock() { runtimes.remove(&id); }
-        let _ = endpoint(&id);
+        let affected = load_binding_raw(&id).ok().flatten()
+            .and_then(|binding| binding.group_id)
+            .is_some_and(|group| affected_groups.contains(&group));
+        if affected {
+            // endpoint takes STORE_LOCK before touching the runtime. Never evict a
+            // listener while another thread is changing this account's binding.
+            if let Ok(_guard) = STORE_LOCK.lock() {
+                let still_affected = load_binding_raw(&id).ok().flatten()
+                    .and_then(|binding| binding.group_id)
+                    .is_some_and(|group| affected_groups.contains(&group));
+                if still_affected {
+                    if let Ok(mut runtimes) = RUNTIMES.lock() { runtimes.remove(&id); }
+                    restart.push(id);
+                }
+            }
+        }
+    }
+    // Inventory writes must not wait for every network health probe. The
+    // listener is already closed, so interim requests fail closed until the
+    // new route starts. A fresh endpoint() call may also start it sooner.
+    if !restart.is_empty() {
+        std::thread::spawn(move || {
+            for id in restart { let _ = endpoint(&id); }
+        });
     }
 }
 
@@ -237,7 +272,7 @@ pub fn inventory_save(
     let clean_group = if group_label.trim().is_empty() { "默认线路组" } else { group_label.trim() };
     let group_id = format!("group-{:x}", Sha256::digest(clean_group.to_ascii_lowercase().as_bytes()));
     let next = ProxyInventoryEntry {
-        id: entry_id,
+        id: entry_id.clone(),
         label: if label.trim().is_empty() { spec.label.clone() } else { label.trim().to_string() },
         group_id,
         group_label: clean_group.to_string(),
@@ -247,22 +282,51 @@ pub fn inventory_save(
     if entries.iter().any(|item| item.id != next.id && item.uri == next.uri) {
         return Err("该代理链接已存在于库存，不能重复作为故障接管线路".into());
     }
+    let old = entries.iter().find(|item| item.id == next.id).cloned();
     if let Some(existing) = entries.iter_mut().find(|item| item.id == next.id) {
         *existing = next;
     } else {
         entries.push(next);
     }
     save_inventory(&entries)?;
-    refresh_inventory_bound_runtimes();
+    let current = entries.iter().find(|item| item.id == entry_id).expect("saved inventory entry");
+    let mut affected = HashSet::new();
+    if old.as_ref().is_none_or(|value| value.group_id != current.group_id || value.uri != current.uri || value.enabled != current.enabled) {
+        affected.insert(current.group_id.clone());
+        if let Some(old) = old { affected.insert(old.group_id); }
+    }
+    refresh_inventory_bound_runtimes(&affected);
     inventory_list()
 }
 
 pub fn inventory_delete(id: &str) -> Result<Vec<ProxyInventoryItem>, String> {
     let _guard = INVENTORY_LOCK.lock().map_err(|_| "代理库存锁异常")?;
     let mut entries = load_inventory()?;
+    let affected = entries.iter().find(|item| item.id == id).map(|item| item.group_id.clone());
     entries.retain(|item| item.id != id);
+    if affected.is_none() { return inventory_list(); }
     save_inventory(&entries)?;
-    refresh_inventory_bound_runtimes();
+    refresh_inventory_bound_runtimes(&HashSet::from([affected.unwrap()]));
+    inventory_list()
+}
+
+/// Move a route without exposing or re-entering its encrypted URI.
+pub fn inventory_move(id: &str, group_label: &str) -> Result<Vec<ProxyInventoryItem>, String> {
+    let clean_group = group_label.trim();
+    if clean_group.is_empty() || clean_group.chars().count() > 80
+        || clean_group.chars().any(char::is_control) {
+        return Err("请填写不超过 80 字的线路组名称".into());
+    }
+    let _guard = INVENTORY_LOCK.lock().map_err(|_| "代理库存锁异常")?;
+    let mut entries = load_inventory()?;
+    let item = entries.iter_mut().find(|item| item.id == id).ok_or("库存线路不存在")?;
+    let old_group = item.group_id.clone();
+    let new_group = format!("group-{:x}", Sha256::digest(clean_group.to_ascii_lowercase().as_bytes()));
+    if old_group == new_group { return inventory_list(); }
+    item.group_id = new_group.clone();
+    item.group_label = clean_group.to_string();
+    save_inventory(&entries)?;
+    refresh_inventory_bound_runtimes(&HashSet::from([old_group, new_group]));
     inventory_list()
 }
 
@@ -277,11 +341,13 @@ fn import_inventory_nodes(group_label: &str, nodes: Vec<SubscriptionNode>) -> Re
     let mut imported = 0;
     let mut updated = 0;
     let mut already_in_other_group = 0;
+    let mut routes_changed = false;
     for node in nodes {
         let id = format!("proxy-{:x}", Sha256::digest(node.normalized_uri.as_bytes()));
         if let Some(entry) = entries.iter_mut().find(|item| item.id == id) {
             if entry.group_id == group_id {
                 entry.label = node.label;
+                routes_changed |= !entry.enabled;
                 entry.enabled = true;
                 updated += 1;
             } else {
@@ -296,11 +362,12 @@ fn import_inventory_nodes(group_label: &str, nodes: Vec<SubscriptionNode>) -> Re
                 uri: node.normalized_uri, enabled: true,
             });
             imported += 1;
+            routes_changed = true;
         }
     }
     if imported + updated > 0 {
         save_inventory(&entries)?;
-        refresh_inventory_bound_runtimes();
+        if routes_changed { refresh_inventory_bound_runtimes(&HashSet::from([group_id])); }
     }
     Ok((imported, updated, already_in_other_group))
 }
@@ -514,18 +581,22 @@ pub fn validate_isolated_binding(profile: &Path, binding: Option<&str>) -> Resul
     Ok(())
 }
 
-fn load_binding(id: &str) -> Result<Option<Binding>, String> {
+fn load_binding_raw(id: &str) -> Result<Option<Binding>, String> {
     let path = binding_path(id)?;
     match std::fs::metadata(&path) {
         Ok(_) => {}
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(_) => return Err("无法读取账号代理配置；为防止直连已阻止请求".into()),
     }
-    let mut binding = super::secure_account_storage::read_account_file_readonly::<Binding>(
+    let binding = super::secure_account_storage::read_account_file_readonly::<Binding>(
         &path,
         &super::account::get_data_dir()?.join("secure-account-storage.key"),
     )
     .map_err(|_| "账号代理配置无法解密或已损坏；为防止直连已阻止请求".to_string())?;
+    Ok(Some(binding))
+}
+
+fn resolve_group_binding(mut binding: Binding) -> Result<Binding, String> {
     if let Some(group_id) = binding.group_id.as_deref() {
         let members = load_inventory()?.into_iter()
             .filter(|item| item.enabled && item.group_id == group_id)
@@ -543,7 +614,11 @@ fn load_binding(id: &str) -> Result<Option<Binding>, String> {
         binding.group_label = Some(active.group_label.clone());
         binding.fallback_uris = members.iter().filter(|item| item.uri != active.uri).map(|item| item.uri.clone()).collect();
     }
-    Ok(Some(binding))
+    Ok(binding)
+}
+
+fn load_binding(id: &str) -> Result<Option<Binding>, String> {
+    load_binding_raw(id)?.map(resolve_group_binding).transpose()
 }
 
 fn allocate_port() -> Result<u16, String> {
@@ -581,7 +656,23 @@ fn allocate_port() -> Result<u16, String> {
 }
 
 pub fn status(id: &str) -> Result<ProxyStatus, String> {
-    let binding = load_binding(id)?;
+    let raw = load_binding_raw(id)?;
+    let (binding, blocked_reason) = match raw {
+        Some(value) => match resolve_group_binding(value.clone()) {
+            Ok(resolved) => (Some(resolved), None),
+            Err(reason) => {
+                // Preserve the editable group identity even when every member
+                // has been removed. The network path remains fail-closed.
+                if let Ok(_guard) = STORE_LOCK.lock() {
+                    if load_binding(id).is_err() {
+                        if let Ok(mut runtimes) = RUNTIMES.lock() { runtimes.remove(id); }
+                    }
+                }
+                (Some(value), Some(reason))
+            }
+        },
+        None => (None, None),
+    };
     let spec = binding.as_ref().map(|b| parse(&b.uri)).transpose()?;
     let inventory_label = if let Some(bound) = binding.as_ref().filter(|item| item.group_id.is_some()) {
         load_inventory()?.into_iter()
@@ -603,12 +694,15 @@ pub fn status(id: &str) -> Result<ProxyStatus, String> {
         .map(|runtime| {
             let running = spec.as_ref().is_some_and(|spec| runtime.fingerprint == key(&spec.normalized_uri))
                 && matches!(runtime.child.try_wait(), Ok(None));
+            let running = running && blocked_reason.is_none();
             (running, running.then(|| runtime.started_at.elapsed().as_secs()))
         })
         .unwrap_or((false, None));
     Ok(ProxyStatus {
         enabled: binding.is_some(),
-        label: inventory_label.or_else(|| spec.as_ref().map(|s| s.label.clone())),
+        label: if blocked_reason.is_some() {
+            binding.as_ref().and_then(|value| value.group_label.clone())
+        } else { inventory_label.or_else(|| spec.as_ref().map(|s| s.label.clone())) },
         protocol: spec.as_ref().map(|s| s.protocol.clone()),
         server_host: parsed_uri.as_ref().and_then(|url| url.host_str().map(str::to_string)),
         server_port: parsed_uri.as_ref().and_then(url::Url::port_or_known_default),
@@ -628,10 +722,56 @@ pub fn status(id: &str) -> Result<ProxyStatus, String> {
         isolation_dir: isolation_dir(id)?.to_string_lossy().into_owned(),
         group_id: binding.as_ref().and_then(|b| b.group_id.clone()),
         group_label: binding.as_ref().and_then(|b| b.group_label.clone()),
-        route_count: binding.as_ref().map(|b| binding_uris(b).len()).unwrap_or(0),
+        route_count: if blocked_reason.is_some() { 0 } else { binding.as_ref().map(|b| binding_uris(b).len()).unwrap_or(0) },
         active_route_index,
         failover_count: binding.as_ref().map(|b| b.failover_count).unwrap_or(0),
+        blocked_reason,
     })
+}
+
+pub fn group_bindings(account_ids: &[String]) -> Result<Vec<ProxyGroupBinding>, String> {
+    if account_ids.len() > 2000 { return Err("一次最多查询 2000 个账号".into()); }
+    let inventory = load_inventory()?;
+    let mut groups: HashMap<&str, Vec<&ProxyInventoryEntry>> = HashMap::new();
+    for item in &inventory {
+        if item.enabled { groups.entry(&item.group_id).or_default().push(item); }
+    }
+    let mut states = Vec::with_capacity(account_ids.len());
+    for id in account_ids {
+        let raw = match load_binding_raw(id) {
+            Ok(value) => value,
+            Err(error) => {
+                states.push(ProxyGroupBinding { account_id: id.clone(), group_id: None,
+                    group_label: None, running: false, blocked_reason: Some(error) });
+                continue;
+            }
+        };
+        let Some(binding) = raw else {
+            states.push(ProxyGroupBinding { account_id: id.clone(), group_id: None,
+                group_label: None, running: false, blocked_reason: None });
+            continue;
+        };
+        let members = binding.group_id.as_deref().and_then(|group| groups.get(group));
+        let active = members.and_then(|entries| entries.iter()
+            .find(|item| item.uri == binding.uri).or_else(|| entries.first()));
+        let blocked_reason = if binding.group_id.is_some() && active.is_none() {
+            Some("账号绑定的代理线路组已无可用线路；已阻止直连".into())
+        } else { None };
+        let expected_uri = active.map(|item| item.uri.as_str()).unwrap_or(&binding.uri);
+        let running = if blocked_reason.is_some() { false } else {
+            RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.get_mut(id)
+                .is_some_and(|runtime| runtime.fingerprint == key(expected_uri)
+                    && matches!(runtime.child.try_wait(), Ok(None)))
+        };
+        states.push(ProxyGroupBinding {
+            account_id: id.clone(),
+            group_id: binding.group_id,
+            group_label: active.map(|item| item.group_label.clone()).or(binding.group_label),
+            running,
+            blocked_reason,
+        });
+    }
+    Ok(states)
 }
 
 fn core_path() -> Result<PathBuf, String> {
@@ -816,7 +956,11 @@ fn monitor_group_route_once(id: &str) -> Result<(), String> {
         Ok(Some(value)) => value,
         Ok(None) => return Ok(()),
         Err(error) => {
-            if let Ok(mut runtimes) = RUNTIMES.lock() { runtimes.remove(id); }
+            if let Ok(_guard) = STORE_LOCK.lock() {
+                if load_binding(id).is_err() {
+                    if let Ok(mut runtimes) = RUNTIMES.lock() { runtimes.remove(id); }
+                }
+            }
             return Err(error);
         }
     };
@@ -824,7 +968,15 @@ fn monitor_group_route_once(id: &str) -> Result<(), String> {
     let is_running = RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?
         .get_mut(id).is_some_and(|runtime| runtime.fingerprint == key(&binding.uri) && matches!(runtime.child.try_wait(), Ok(None)));
     if is_running && probe_proxy_port(binding.port).is_ok() { return Ok(()); }
-    RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.remove(id);
+    {
+        let _guard = STORE_LOCK.lock().map_err(|_| "代理配置锁异常")?;
+        // A user may have hot-switched this account while the health probe
+        // was in flight. Never evict the newly installed listener.
+        if load_binding_raw(id)?.is_none_or(|latest| latest.uri != binding.uri || latest.group_id != binding.group_id) {
+            return Ok(());
+        }
+        RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.remove(id);
+    }
     endpoint(id)?.ok_or("代理线路组没有可用线路；已阻止直连")?;
     Ok(())
 }
@@ -1082,9 +1234,12 @@ pub fn promote_pending(login_id: Option<&str>, account_id: &str) -> Result<(), S
     let selection = PENDING_BINDINGS.lock().ok().and_then(|pending| pending.get(key).map(|value| value.selection.clone()))
         .or_else(|| pending_uri(login_id).map(|uri| RouteSelection { uris: vec![uri], group_id: None, group_label: None }))
         .ok_or_else(|| "添加账号代理不存在；已阻止首次账号请求".to_string())?;
-    if let Some(existing) = load_binding(account_id)? {
-        if existing.uri != selection.uris.first().cloned().unwrap_or_default() {
-            return Err("现有账号已绑定另一代理；请先停止 API 服务并在账号卡片中修改绑定".into());
+    if let Some(existing) = load_binding_raw(account_id)? {
+        if existing.uri != selection.uris.first().cloned().unwrap_or_default()
+            || existing.group_id != selection.group_id {
+            // Reauthorization must continue on the same network used during
+            // login, even when this account is already served by the gateway.
+            save_selection(account_id, selection)?;
         }
         clear_pending(login_id);
         return Ok(());
@@ -1148,12 +1303,16 @@ fn save_selection(id: &str, selection: RouteSelection) -> Result<ProxyStatus, St
     {
         let _guard = STORE_LOCK.lock().map_err(|_| "代理配置锁异常")?;
         let path = binding_path(id)?;
-        let old_binding = load_binding(id)?;
+        // Read the encrypted record, not its resolved group. A group with zero
+        // usable routes is still an editable binding, never a permanent lock.
+        let old_binding = load_binding_raw(id)?;
         let port = match old_binding.as_ref() { Some(old) => old.port, None => allocate_port()? };
         let mut active_uri = None;
-        let mut runtime = None;
         let mut last_error = "代理线路组没有可用线路".to_string();
-        RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.remove(id);
+        let live_uri = RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?
+            .get_mut(id).and_then(|runtime| {
+                matches!(runtime.child.try_wait(), Ok(None)).then(|| runtime.fingerprint.clone())
+            });
         for uri in &selection.uris {
             let spec = parse(uri)?;
             if let Ok(url) = url::Url::parse(&spec.normalized_uri) {
@@ -1161,20 +1320,49 @@ fn save_selection(id: &str, selection: RouteSelection) -> Result<ProxyStatus, St
                     && url.port() == Some(port)
                 { return Err("上游代理不能指向账号自身监听端口".into()); }
             }
-            match spawn_core(&spec, port) {
-                Ok(value) => {
-                    if selection.group_id.is_some() && probe_proxy_port(port).is_err() {
-                        drop(value);
+            if live_uri.as_deref() == Some(key(&spec.normalized_uri).as_str()) {
+                active_uri = Some(spec.normalized_uri);
+                break;
+            }
+            // Preflight on an unshared temporary port while the old listener
+            // stays alive. A failed candidate cannot interrupt live traffic.
+            let test_port = allocate_port()?;
+            match spawn_core(&spec, test_port) {
+                Ok(test_runtime) => {
+                    if selection.group_id.is_some() && probe_proxy_port(test_port).is_err() {
+                        drop(test_runtime);
                         last_error = "代理线路健康检测失败".into();
                         continue;
                     }
-                    active_uri = Some(spec.normalized_uri); runtime = Some(value); break;
+                    drop(test_runtime);
+                    active_uri = Some(spec.normalized_uri);
+                    break;
                 }
                 Err(error) => last_error = error,
             }
         }
         let active_uri = active_uri.ok_or(last_error)?;
-        let runtime = runtime.ok_or("代理线路组启动失败")?;
+        let route_unchanged = live_uri.as_deref() == Some(key(&active_uri).as_str());
+        if !route_unchanged {
+            RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.remove(id);
+            let spec = parse(&active_uri)?;
+            let runtime = match spawn_core(&spec, port) {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    if let Some(old) = old_binding.as_ref() {
+                        if let Ok(spec) = parse(&old.uri) {
+                            if let Ok(runtime) = spawn_core(&spec, port) {
+                                RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?
+                                    .insert(id.to_string(), runtime);
+                            }
+                        }
+                    }
+                    return Err(format!("新线路切换失败，原绑定未改动：{error}"));
+                }
+            };
+            RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?
+                .insert(id.to_string(), runtime);
+        }
         let fallback_uris = selection.uris.iter().filter(|uri| *uri != &active_uri).cloned().collect();
         let binding = Binding {
             last_exit_ip: old_binding.as_ref().filter(|old| old.uri == active_uri).and_then(|old| old.last_exit_ip.clone()),
@@ -1189,10 +1377,20 @@ fn save_selection(id: &str, selection: RouteSelection) -> Result<ProxyStatus, St
         };
         std::fs::create_dir_all(path.parent().ok_or("无效代理目录")?).map_err(|_| "创建代理存储目录失败")?;
         let content = super::secure_account_storage::serialize_account_file("codex-account-proxy", &binding)?;
-        super::atomic_write::write_string_atomic(&path, &content).map_err(|_| "保存加密代理配置失败")?;
-        let mut runtimes = RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?;
-        runtimes.remove(id);
-        runtimes.insert(id.to_string(), runtime);
+        if super::atomic_write::write_string_atomic(&path, &content).is_err() {
+            if !route_unchanged {
+                RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?.remove(id);
+                if let Some(old) = old_binding.as_ref() {
+                    if let Ok(spec) = parse(&old.uri) {
+                        if let Ok(runtime) = spawn_core(&spec, port) {
+                            RUNTIMES.lock().map_err(|_| "代理运行状态锁异常")?
+                                .insert(id.to_string(), runtime);
+                        }
+                    }
+                }
+            }
+            return Err("保存加密代理配置失败；原绑定未改动".into());
+        }
         if binding.group_id.is_some() { begin_group_monitor(id); }
     }
     status(id)

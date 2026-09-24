@@ -2,7 +2,7 @@
 
 本仓库是基于 [jlcodes99/cockpit-tools v1.3.59](https://github.com/jlcodes99/cockpit-tools/tree/v1.3.59) 的独立修改版，不是上游项目或 OpenAI 的官方版本。V4 面向 Windows x64 的 Codex 多账号 API 服务：每个账号绑定自己的代理网络，添加账号时也先配置代理；代理不可用时阻断该账号请求，不回退直连。
 
-V4 新增代理库存与线路组故障接管、VLESS/Reality、Hysteria2、TUIC 等协议支持、一次性 V2Ray/Clash 订阅导入、账号请求链路详情和按请求频率变化的绿色呼吸灯。默认 Codex/ChatGPT 桌面客户端仍使用电脑原有资料目录；逐账号“隔离启动”才使用独立目录。客户端登录、更新等非模型流量不属于账号池代理的保障范围。
+V4 新增独立代理管理页、线路与账号拖动分组、运行中热切换和空组恢复；保留代理库存与组内故障接管、VLESS/Reality、Hysteria2、TUIC 等协议支持、一次性 V2Ray/Clash 订阅导入、账号请求链路详情，并将请求热度显示为渐退的红色呼吸灯。默认 Codex/ChatGPT 桌面客户端仍使用电脑原有资料目录；逐账号“隔离启动”才使用独立目录。客户端登录、更新等非模型流量不属于账号池代理的保障范围。
 
 - [V4 功能与网络边界](V4-ISOLATION-README.md)
 - [从源码构建](SOURCE-BUILD.md)

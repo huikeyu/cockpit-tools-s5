@@ -31,6 +31,9 @@ export function CodexProxyInventoryPicker({ onSelect }: Props) {
   const [fetchViaId, setFetchViaId] = useState('');
   const [allowDirect, setAllowDirect] = useState(false);
   const [importReport, setImportReport] = useState<SubscriptionImportResult | null>(null);
+  const [query, setQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(60);
+  const filteredItems = items.filter(item => `${item.label} ${item.groupLabel} ${item.protocol}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const refresh = async () => {
     try { setItems(await invoke<CodexProxyInventoryItem[]>('codex_get_proxy_inventory')); }
     catch (value) { setError(String(value).replace(/^Error:\s*/, '')); }
@@ -76,14 +79,16 @@ export function CodexProxyInventoryPicker({ onSelect }: Props) {
           <header><div><span>V4 · 代理库存</span><h2><Boxes size={20} />线路与故障接管组</h2></div><button type="button" onClick={() => setOpen(false)} aria-label="关闭"><X size={18} /></button></header>
           <div className="codex-proxy-inventory-body">
             <p className="codex-proxy-inventory-hint">选择一条线路后，账号会绑定它所属的线路组；主线路失效时，服务会按同组其他线路接管。节点链接只保存在本机加密库存。</p>
+            <input className="codex-proxy-inventory-search" aria-label="搜索库存线路" value={query} onChange={event => { setQuery(event.target.value); setVisibleCount(60); }} placeholder="搜索线路名称、分组或协议" />
             <div className="codex-proxy-inventory-list">
               {items.length === 0 && <p className="codex-proxy-inventory-empty">库存为空，请先添加线路。</p>}
-              {items.map((item) => <div className="codex-proxy-inventory-item" key={item.id}>
+              {filteredItems.slice(0, visibleCount).map((item) => <div className="codex-proxy-inventory-item" key={item.id}>
                 <div className="codex-proxy-inventory-item-copy"><strong>{item.label}</strong><span>{item.groupLabel} · {item.protocol.toUpperCase()} · {item.serverHost}:{item.serverPort}{item.insecureTls ? ' · ⚠ TLS 证书验证已关闭' : ''}</span></div>
                 <button type="button" className="codex-proxy-inventory-use" onClick={() => { onSelect('inventory://' + item.id); setOpen(false); }}><Check size={14} />选择</button>
                 <button type="button" className="codex-proxy-inventory-use" onClick={() => { setEditingId(item.id); setLabel(item.label); setGroup(item.groupLabel); setUri(''); }}><Pencil size={14} />编辑</button>
                 <button type="button" className="codex-proxy-inventory-delete" onClick={() => void remove(item.id)} disabled={busy} aria-label={'删除 ' + item.label}><Trash2 size={14} /></button>
               </div>)}
+              {filteredItems.length > visibleCount && <button type="button" className="codex-proxy-inventory-more" onClick={() => setVisibleCount(value => value + 60)}>再显示 60 条 · 剩余 {filteredItems.length - visibleCount} 条</button>}
             </div>
             <details className="codex-proxy-inventory-add" open={editingId ? true : undefined}><summary><Plus size={14} />{editingId ? '编辑库存线路' : '添加库存线路'}</summary>
               <label>线路名称<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="美国主线路" /></label>

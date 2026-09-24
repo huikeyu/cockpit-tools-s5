@@ -9,3 +9,5 @@
 .codex-proxy-inventory-direct input{width:auto;accent-color:#0b9673}
 .codex-proxy-inventory-result{margin:10px 0 0;padding:9px;border-radius:7px;background:rgba(12,155,122,.08);color:#087b64;font-size:11px;line-height:1.5}
 .codex-proxy-inventory-warning{display:block;margin-top:7px;color:#ad6b1d;font-size:10px;line-height:1.5}
+.codex-proxy-inventory-search{width:100%;box-sizing:border-box;margin:0 0 10px;padding:8px 10px;border:1px solid #cdd7e4;border-radius:8px;background:var(--bg-secondary,#f8fafc);color:inherit;font-size:12px}
+.codex-proxy-inventory-more{border:1px solid #b7c8d8;border-radius:8px;padding:8px;background:var(--bg-secondary,#f8fafc);color:#426787;font-size:11px;cursor:pointer}

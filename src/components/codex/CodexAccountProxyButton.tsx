@@ -49,7 +49,7 @@ export function CodexAccountProxyButton({ account, compact = false }: { account:
   const save = () => run('保存代理', async () => {
     const value = await invoke<CodexProxyStatus>('codex_save_account_proxy', { accountId: account.id, proxyUri: draft });
     setStatus(value); setDraft(''); setVisible(false); setProbe(null);
-    setMessage('节点已加密保存。启动 API 服务后，此账号的上游请求将使用这个节点。');
+    setMessage('代理已安全切换。API 服务不需重启；切换瞬间正在进行的请求可能需要重试。');
   });
   const test = () => run('测试出口', async () => {
     setProbe(null);
@@ -83,8 +83,9 @@ export function CodexAccountProxyButton({ account, compact = false }: { account:
           <div className="account-proxy-input"><input ref={field} id={inputId} type={visible ? 'text' : 'password'} value={draft} disabled={!!busy} autoComplete="off" spellCheck={false} placeholder="vless://UUID@服务器:端口?... 或 http(s)/socks5://..." onChange={e => { setDraft(e.target.value); setProbe(null); }} /><button type="button" aria-label={visible ? '隐藏链接' : '显示链接'} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
           <CodexProxyInventoryPicker onSelect={(value) => { setDraft(value); setProbe(null); }} />
           {status?.groupLabel && <p className="account-proxy-hint">当前接管组：{status.groupLabel} · {status.routeCount} 条线路 · 已接管 {status.failoverCount} 次</p>}
+          {status?.blockedReason && <p className="account-proxy-error" role="alert">{status.blockedReason}；仍可在下方选择其他线路组恢复。</p>}
           <p className="account-proxy-hint">支持 VLESS TCP/WS、Reality/TLS、Vision、Hysteria2、TUIC，以及 HTTP / HTTPS / SOCKS5。带 insecure=1 的节点会关闭 TLS 证书验证，请谨慎使用。保存后不回显节点密码。</p>
-          <div className="account-proxy-scope"><strong>这张卡对应账号的上游出口</strong><p>API 服务按实际选中的账号使用各自节点；总服务卡不需要选一个统一代理。客户端访问本机 localhost，模型请求再由账号代理转发。</p><p>新增或重新授权账号时，请在“添加账号”窗口先填代理并测试出口。修改此绑定前请停止 API 服务。</p></div>
+          <div className="account-proxy-scope"><strong>这张卡对应账号的上游出口</strong><p>API 服务按实际选中的账号使用各自节点；总服务卡不需要选一个统一代理。客户端访问本机 localhost，模型请求再由账号代理转发。</p><p>新增或重新授权账号时，请在“添加账号”窗口先填代理并测试出口。运行中可以换组；旧连接会断开，个别进行中的请求可能需要重试，不会直连。</p></div>
           {status && <details><summary>账号专用目录</summary><code>{status.isolationDir}</code></details>}
           <p className="account-proxy-hint">测试出口会通过该代理访问 api.ipify.org，仅查询公网 IP，不发送账号令牌。不同节点也可能共用同一出口 IP，请分别核对。</p>
           {probe && <div className="account-proxy-success" role="status">出口 IP：<strong>{probe.exitIp}</strong> · {probe.latencyMs} ms</div>}

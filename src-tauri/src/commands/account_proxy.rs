@@ -116,33 +116,22 @@ pub async fn codex_save_account_proxy(
     proxy_uri: Option<String>,
 ) -> Result<ProxyStatus, String> {
     require_account(&account_id)?;
-    // Changing a live route would leave old direct/pooled connections alive. Require a clean stop.
-    modules::codex_local_access::ensure_account_proxy_edit_safe(&account_id).await?;
     tauri::async_runtime::spawn_blocking(move || {
-        let store = modules::codex_instance::load_instance_store()?;
-        for instance in &store.instances {
-            if instance.bind_account_id.as_deref() == Some(&account_id)
-                && modules::process::resolve_codex_pid(
-                    instance.last_pid,
-                    Some(&instance.user_data_dir),
-                )
-                .is_some()
-            {
-                return Err(
-                    "请先停止绑定此账号的 Codex 实例，再修改代理；避免旧连接绕过新代理".into(),
-                );
-            }
-        }
-        if modules::codex_account::get_current_account().is_some_and(|a| a.id == account_id) {
-            let home = modules::codex_instance::get_default_codex_home()?;
-            if modules::process::resolve_codex_pid(None, Some(&home.to_string_lossy())).is_some() {
-                return Err("请先退出使用此账号的默认 Codex 实例，再修改代理".into());
-            }
-        }
+        // The sidecar and desktop client keep the same account-local loopback
+        // address. save() preflights the replacement and swaps that listener;
+        // old upstream connections are closed, never redirected to direct.
         account_proxy::save(&account_id, proxy_uri.as_deref())
     })
     .await
     .map_err(|_| "保存代理任务失败")?
+}
+
+#[tauri::command]
+pub async fn codex_get_proxy_group_bindings(account_ids: Vec<String>) -> Result<Vec<account_proxy::ProxyGroupBinding>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        for id in &account_ids { require_account(id)?; }
+        account_proxy::group_bindings(&account_ids)
+    }).await.map_err(|_| "读取分组绑定任务失败")?
 }
 
 #[derive(Serialize)]
@@ -271,6 +260,15 @@ pub async fn codex_delete_proxy_inventory_entry(
 ) -> Result<Vec<account_proxy::ProxyInventoryItem>, String> {
     tauri::async_runtime::spawn_blocking(move || account_proxy::inventory_delete(&id))
         .await.map_err(|_| "删除代理库存任务失败")?
+}
+
+#[tauri::command]
+pub async fn codex_move_proxy_inventory_entry(
+    id: String,
+    group_label: String,
+) -> Result<Vec<account_proxy::ProxyInventoryItem>, String> {
+    tauri::async_runtime::spawn_blocking(move || account_proxy::inventory_move(&id, &group_label))
+        .await.map_err(|_| "移动库存线路任务失败")?
 }
 
 #[tauri::command]

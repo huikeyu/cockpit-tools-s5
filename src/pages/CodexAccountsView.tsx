@@ -5,6 +5,7 @@ import { CodexOverviewTabsHeader } from "../components/CodexOverviewTabsHeader";
 import { CodexInstancesContent } from "./CodexInstancesPage";
 import { CodexLaunchPreviewModal } from "../components/codex/CodexLaunchPreviewModal";
 import { CodexSessionManager } from "../components/codex/CodexSessionManager";
+import { CodexProxyManager } from "../components/codex/CodexProxyManager";
 import { CodexCliLaunchDialog } from "../components/codex/CodexCliLaunchDialog";
 import { CodexWakeupContent } from "../components/codex/CodexWakeupContent";
 import { CodexModelProviderManager } from "../components/codex/CodexModelProviderManager";
@@ -170,7 +171,7 @@ export function CodexAccountsView(props: CodexAccountsViewProps) {
       <CodexOverviewTabsHeader
         active={activeTab}
         onTabChange={setActiveTab}
-        tabs={["overview", "providers", "wakeup", "instances", "sessions"]}
+        tabs={["overview", "proxy", "providers", "wakeup", "instances", "sessions"]}
       />
 
       {batchImportOpen &&
@@ -817,11 +818,13 @@ export function CodexAccountsView(props: CodexAccountsViewProps) {
         </div>
       )}
 
-      {renderCockpitApiServicePanel()}
+      {activeTab !== "proxy" && renderCockpitApiServicePanel()}
       {renderApiKeyUsageDetailModal()}
       {renderQuotaErrorDetailModal()}
 
       {activeTab === "overview" && <CodexAccountsOverviewPanel {...props} />}
+
+      {activeTab === "proxy" && <CodexProxyManager accounts={accounts} privacyMode={props.privacyModeEnabled} />}
 
       {cliLaunchModal && (
         <CodexCliLaunchDialog

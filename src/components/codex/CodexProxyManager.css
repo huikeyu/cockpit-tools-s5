@@ -1,0 +1,56 @@
+.codex-proxy-manager{margin:16px 22px 30px;min-width:0;color:var(--text-primary,#172033)}
+.codex-proxy-manager-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:13px}
+.codex-proxy-manager-head>div>span{font-size:10px;letter-spacing:.12em;color:#557aa3;font-weight:800}
+.codex-proxy-manager-head h2{display:flex;align-items:center;gap:9px;margin:4px 0;font-size:22px}
+.codex-proxy-manager-head p{margin:0;color:var(--text-secondary,#64748b);font-size:12px;line-height:1.5}
+.codex-proxy-manager-head button{display:flex;align-items:center;gap:6px;flex:none}
+.codex-proxy-manager-alert{margin:8px 0;padding:9px 12px;border:1px solid #86b7a344;border-radius:9px;background:#7dcaa315;color:#277455;font-size:12px}
+.codex-proxy-manager-alert.is-error{border-color:#e5838344;background:#e5838315;color:#ba4848}
+.codex-proxy-manager-columns{display:grid;grid-template-columns:minmax(175px,.8fr) minmax(340px,2fr) minmax(235px,1.15fr);gap:12px;align-items:stretch}
+.codex-proxy-manager-columns>aside,.codex-proxy-manager-routes{min-width:0;min-height:580px;padding:13px;border:1px solid var(--border-color,#dfe7f0);border-radius:14px;background:var(--bg-primary,#fff);box-shadow:0 6px 25px #14243a09}
+.codex-proxy-manager-section-title{min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:13px;font-weight:800}
+.codex-proxy-manager-section-title b{font-size:10px;font-weight:700;color:#67819a;border-radius:100px;background:#83a0bf19;padding:3px 7px}
+.codex-proxy-manager-section-title label{display:flex;align-items:center;gap:5px;min-width:0;border:1px solid var(--border-color,#dfe7f0);border-radius:8px;padding:5px 7px;font-size:11px}
+.codex-proxy-manager-section-title label input{min-width:0;width:155px;border:0;outline:0;background:transparent;color:inherit;font-size:11px}
+.codex-proxy-manager-group-list{display:flex;flex-direction:column;gap:6px;max-height:494px;overflow:auto}
+.codex-proxy-manager-group{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;min-width:0;padding:10px 11px;border:1px solid var(--border-color,#e2e8f0);border-radius:10px;background:var(--bg-secondary,#fafbfd);color:inherit;text-align:left;cursor:pointer;transition:background .14s ease,border-color .14s ease,transform .14s ease}
+.codex-proxy-manager-group:hover,.codex-proxy-manager-group.is-drop{border-color:#4399bb;background:#4199c117;transform:translateY(-1px)}
+.codex-proxy-manager-group.is-selected{border-color:#397eac;background:#458fbc18}
+.codex-proxy-manager-group.is-empty{border-color:#dc777777}
+.codex-proxy-manager-group strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.codex-proxy-manager-group small{font-size:10px;color:var(--text-secondary,#718096)}
+.codex-proxy-manager-new-group{display:flex;flex-direction:column;gap:6px;margin-top:13px;padding:11px;border:1px dashed #7ca1bd;border-radius:10px;color:var(--text-secondary,#718096);font-size:11px}
+.codex-proxy-manager-new-group input{min-width:0;padding:7px;border:1px solid var(--border-color,#dce5ef);border-radius:6px;background:var(--bg-primary,#fff);color:inherit}
+.codex-proxy-manager-virtual{height:464px;overflow:auto;overscroll-behavior:contain;border-top:1px solid var(--border-color,#e6ebf1);border-bottom:1px solid var(--border-color,#e6ebf1)}
+.codex-proxy-manager-route{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--border-color,#e6ebf1);border-radius:8px;background:var(--bg-secondary,#fafbfd)}
+.codex-proxy-manager-route .drag-handle,.codex-proxy-manager-account .drag-handle{flex:none;color:#92a5b8;cursor:grab}
+.codex-proxy-manager-route .route-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}
+.codex-proxy-manager-route strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.codex-proxy-manager-route small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary,#718096);font-size:10px}
+.codex-proxy-manager-route select{max-width:82px;min-width:0;border:1px solid var(--border-color,#dce5ef);border-radius:6px;padding:4px 3px;background:var(--bg-primary,#fff);color:inherit;font-size:10px}
+.codex-proxy-manager-route button,.codex-proxy-manager-account button{display:grid;place-items:center;flex:none;width:24px;height:24px;border:1px solid var(--border-color,#dce5ef);border-radius:6px;background:var(--bg-primary,#fff);color:var(--text-secondary,#65758a);cursor:pointer}
+.codex-proxy-manager-route button:hover,.codex-proxy-manager-account button:hover{color:#2874a9;border-color:#6ea4c9}
+.codex-proxy-manager-route button:disabled,.codex-proxy-manager-account button:disabled{opacity:.45;cursor:default}
+.codex-proxy-manager-empty{margin:12px 2px;color:var(--text-secondary,#718096);font-size:11px;line-height:1.5}
+.codex-proxy-manager-editor{margin-top:10px;border:1px solid var(--border-color,#e3eaf2);border-radius:9px;padding:9px}
+.codex-proxy-manager-editor summary{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:700;cursor:pointer}
+.codex-proxy-manager-form{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px}
+.codex-proxy-manager-form>input,.codex-proxy-manager-form>select{min-width:130px;flex:1;padding:8px;border:1px solid var(--border-color,#dce5ef);border-radius:7px;background:var(--bg-secondary,#fafbfd);color:inherit;font-size:11px}
+.codex-proxy-manager-form>input[type=password]{flex-basis:100%}
+.codex-proxy-manager-form button{display:flex;gap:5px;align-items:center}
+.codex-proxy-manager-account-list{max-height:530px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.codex-proxy-manager-account{display:flex;align-items:center;gap:7px;min-width:0;padding:9px 8px;border:1px solid var(--border-color,#e5ebf2);border-radius:9px;background:var(--bg-secondary,#fafbfd)}
+.codex-proxy-manager-account.is-in-group{border-color:#5b9cba77;background:#459cbd0c}
+.codex-proxy-manager-account.is-blocked{border-color:#d1767677}
+.codex-proxy-manager-account>div{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}
+.codex-proxy-manager-account strong,.codex-proxy-manager-account small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.codex-proxy-manager-account strong{font-size:11px}.codex-proxy-manager-account small{font-size:10px;color:var(--text-secondary,#718096)}
+.codex-proxy-manager-account.is-blocked small{color:#ba5656}
+.codex-proxy-manager-note{margin:13px 0 0;color:var(--text-secondary,#718096);font-size:10px;line-height:1.55}
+.codex-proxy-manager-import{margin-top:12px;padding:12px;border:1px solid var(--border-color,#e3eaf2);border-radius:10px;background:var(--bg-primary,#fff)}
+.codex-proxy-manager-import summary{cursor:pointer;font-size:12px;font-weight:700}
+.codex-proxy-manager-import label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary,#718096)}
+.codex-proxy-manager-import p{font-size:11px}
+.codex-proxy-manager-busy{position:fixed;right:28px;bottom:24px;z-index:200;padding:11px 14px;border-radius:10px;background:#284b6e;color:#fff;box-shadow:0 8px 28px #0003;font-size:12px}
+@media(max-width:1100px){.codex-proxy-manager-columns{grid-template-columns:minmax(175px,.7fr) minmax(330px,1.6fr)}.codex-proxy-manager-accounts{grid-column:1/-1;min-height:0!important}.codex-proxy-manager-account-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));max-height:260px}}
+@media(max-width:660px){.codex-proxy-manager{margin:12px}.codex-proxy-manager-columns{grid-template-columns:1fr}.codex-proxy-manager-columns>aside,.codex-proxy-manager-routes{min-height:0}.codex-proxy-manager-group-list{max-height:220px}.codex-proxy-manager-virtual{height:350px}.codex-proxy-manager-accounts{grid-column:auto}}
