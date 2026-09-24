@@ -37,7 +37,7 @@ try {
     $nodeVersion = 'v22.23.2'
     $nodeDir = Join-Path $toolchain "node-$nodeVersion-win-x64"
     if (!(Test-Path -LiteralPath (Join-Path $nodeDir 'node.exe'))) {
-        $sums = (Invoke-WebRequest -UseBasicParsing "https://nodejs.org/dist/$nodeVersion/SHASUMS256.txt").Content
+        $sums = [string](Invoke-WebRequest -UseBasicParsing "https://nodejs.org/dist/$nodeVersion/SHASUMS256.txt").Content
         $line = ($sums -split "`n" | Where-Object { $_ -match "node-$nodeVersion-win-x64.zip$" } | Select-Object -First 1)
         if (!$line) { throw 'Official Node.js checksum missing' }
         Download-Verified "https://nodejs.org/dist/$nodeVersion/node-$nodeVersion-win-x64.zip" (Join-Path $cache 'node.zip') (($line.Trim() -split '\s+')[0])
@@ -53,7 +53,12 @@ try {
     $env:PATH = "$nodeDir;$(Join-Path $goDir 'bin');$(Join-Path $env:CARGO_HOME 'bin');$env:PATH"
     if (!(Test-Path -LiteralPath (Join-Path $env:CARGO_HOME 'bin\rustup.exe'))) {
         $rustupUrl = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'
-        $rustupHash = ((Invoke-WebRequest -UseBasicParsing ($rustupUrl + '.sha256')).Content.Trim() -split '\s+')[0]
+        # Windows PowerShell 5.1 returns this octet-stream response as byte[];
+        # fetch it as text with curl so the hash parses as plain ASCII.
+        $rustupShaPath = Join-Path $cache 'rustup-init.exe.sha256'
+        & curl.exe -fsSL --retry 3 --connect-timeout 20 --max-time 120 -o $rustupShaPath ($rustupUrl + '.sha256')
+        if ($LASTEXITCODE -ne 0) { throw "Download failed: $rustupUrl.sha256" }
+        $rustupHash = ((Get-Content -LiteralPath $rustupShaPath -Raw).Trim() -split '\s+')[0]
         Download-Verified $rustupUrl (Join-Path $cache 'rustup-init.exe') $rustupHash
         Run-Step (Join-Path $cache 'rustup-init.exe') @('-y','--no-modify-path','--profile','minimal','--default-toolchain','1.94.0')
     }
