@@ -56,8 +56,57 @@ pub fn normalize_share_link(input: &str) -> String {
     value.trim().to_string()
 }
 
+/// Percent-encode one userinfo component (`user` or `pass`). `%` is preserved
+/// so already-encoded values are not double-encoded.
+pub(crate) fn percent_encode_userinfo_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric()
+            || matches!(ch, '%' | '-' | '.' | '_' | '~' | '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':')
+        {
+            encoded.push(ch);
+        } else {
+            let mut buffer = [0u8; 4];
+            for byte in ch.encode_utf8(&mut buffer).as_bytes() {
+                encoded.push('%');
+                encoded.push_str(&format!("{byte:02X}"));
+            }
+        }
+    }
+    encoded
+}
+
+/// Percent-encode characters that are illegal inside the userinfo component
+/// (`scheme://user:pass@host:port`). Some providers put the region into the
+/// username (e.g. `...-st-New York-city-New York City-...`), so a pasted link
+/// can contain spaces even though the link itself is well formed.
+/// `%` is preserved so already-encoded credentials are not double-encoded.
+fn encode_share_link_userinfo(value: &str) -> String {
+    let Some(scheme_end) = value.find("://") else { return value.to_string() };
+    let rest = &value[scheme_end + 3..];
+    let Some(at) = rest.find('@') else { return value.to_string() };
+    let userinfo = &rest[..at];
+    if userinfo
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '%' | '-' | '.' | '_' | '~' | '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':'))
+    {
+        return value.to_string();
+    }
+    // Control characters (including tab/newline) must keep failing the parse
+    // checks instead of being silently encoded away.
+    if userinfo.chars().any(char::is_control) {
+        return value.to_string();
+    }
+    format!(
+        "{}{}{}",
+        &value[..scheme_end + 3],
+        percent_encode_userinfo_component(userinfo),
+        &rest[at..]
+    )
+}
+
 pub fn parse(input: &str) -> Result<ProxySpec, String> {
-    let normalized_uri = normalize_share_link(input);
+    let normalized_uri = encode_share_link_userinfo(&normalize_share_link(input));
     if normalized_uri.is_empty()
         || normalized_uri.len() > 8192
         || normalized_uri.contains("](mailto:")
@@ -438,5 +487,48 @@ mod tests {
         assert_eq!(parse(input).unwrap().normalized_uri,
             "hysteria2://prefix-part@example.invalid:443?sni=example.invalid");
         assert!(parse("hysteria2://[safe@example.invalid](mailto:other@example.invalid):443").is_err());
+    }
+
+    #[test]
+    fn percent_encodes_whitespace_in_userinfo_without_double_encoding() {
+        // 1024proxy-style username: region/state/city contain spaces.
+        let pasted = "socks5://e4uu743633-region-US-st-New York-city-New York City-sid-c5fVZ2BT-t-120:zqkgnyvs@us.1024proxy.io:3000";
+        let spec = parse(pasted).unwrap();
+        assert_eq!(spec.protocol, "socks5");
+        assert_eq!(
+            spec.normalized_uri,
+            "socks5://e4uu743633-region-US-st-New%20York-city-New%20York%20City-sid-c5fVZ2BT-t-120:zqkgnyvs@us.1024proxy.io:3000"
+        );
+        let server = &spec.xray_config(32100)["outbounds"][0]["settings"]["servers"][0];
+        assert_eq!(server["address"], "us.1024proxy.io");
+        assert_eq!(server["port"], 3000);
+        assert_eq!(
+            server["users"][0]["user"],
+            "e4uu743633-region-US-st-New York-city-New York City-sid-c5fVZ2BT-t-120"
+        );
+        assert_eq!(server["users"][0]["pass"], "zqkgnyvs");
+
+        // Existing percent escapes stay single-decoded.
+        let spec = parse("socks5://a%40b:p%3Ass+word@192.0.2.1:1080").unwrap();
+        let server = &spec.xray_config(32101)["outbounds"][0]["settings"]["servers"][0];
+        assert_eq!(server["users"][0]["user"], "a@b");
+        assert_eq!(server["users"][0]["pass"], "p:ss+word");
+
+        // Non-ASCII credentials are encoded too.
+        let spec = parse("socks5://用户:密码@192.0.2.2:1080").unwrap();
+        let server = &spec.xray_config(32102)["outbounds"][0]["settings"]["servers"][0];
+        assert_eq!(server["users"][0]["user"], "用户");
+        assert_eq!(server["users"][0]["pass"], "密码");
+    }
+
+    #[test]
+    fn still_rejects_control_characters_and_multiline_pastes() {
+        for value in [
+            "socks5://host:1080\nhttp://other:80",
+            "socks5://user:pass@host:1080\r\nhttp://other:80",
+            "socks5://user\tname:pass@host:1080\thttp://other:80",
+        ] {
+            assert!(parse(value).is_err(), "{value} should be rejected");
+        }
     }
 }
