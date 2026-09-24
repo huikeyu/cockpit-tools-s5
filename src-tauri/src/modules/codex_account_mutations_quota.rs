@@ -510,6 +510,9 @@ pub fn update_api_key_credentials(
     )?;
     let old_id = account.id.clone();
     let new_id = build_api_key_account_id(&normalized_key);
+    if new_id != old_id && crate::modules::account_proxy::status(&old_id)?.enabled {
+        return Err("此账号已绑定独立代理。更换 API Key 会改变账号 ID，请先停止实例并解除代理绑定，更新后重新绑定".into());
+    }
     let mut index = load_account_index();
     let was_current = get_current_account()
         .map(|current| current.id == old_id)

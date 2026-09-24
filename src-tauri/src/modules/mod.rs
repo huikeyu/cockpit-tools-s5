@@ -1,4 +1,5 @@
 pub mod account;
+pub mod account_proxy;
 pub mod account_index_repair;
 pub mod announcement;
 pub mod apikey_fun_links;

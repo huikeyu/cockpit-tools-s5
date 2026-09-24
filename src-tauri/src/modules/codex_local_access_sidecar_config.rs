@@ -1416,10 +1416,11 @@ fn sync_sidecar_auth_file_for_account_with_task_source(
     if !prefer_account_task {
         adopt_sidecar_agent_identity_task(&mut effective_account, &auth_path)?;
     }
+    let account_proxy = crate::modules::account_proxy::effective_proxy(&account.id, proxy_signature.proxy_url.as_deref())?;
     let auth_json = sidecar_auth_json_for_account(
         &effective_account,
         &collection,
-        proxy_signature.proxy_url.as_deref(),
+        account_proxy.as_deref(),
     );
     let auth_content = serde_json::to_string_pretty(&auth_json)
         .map_err(|e| format!("序列化 sidecar Codex OAuth 认证失败: {}", e))?;
@@ -2287,6 +2288,9 @@ fn prepare_sidecar_launch_config_in_dir_sync(
         if !eligible {
             continue;
         }
+        // Account bindings take precedence over service/global/environment proxy settings.
+        let account_proxy = crate::modules::account_proxy::effective_proxy(&account.id, effective_proxy_url_ref)?;
+        let effective_proxy_url_ref = account_proxy.as_deref();
         if codex_account::is_grok_upstream_provider(&account) {
             // Grok 供应商账号：把绑定的 Grok 平台账号令牌写成 xai auth 文件，
             // sidecar 用 Grok(xAI) 执行器承接该账号的模型。
@@ -2441,6 +2445,24 @@ fn prepare_sidecar_launch_config_in_dir_sync(
             &runtime_collection,
             &routing_accounts,
         );
+    }
+    // Provider-native / Chat Completions routes also need the selected account's proxy.
+    for value in &mut api_key_manifest_values {
+        if value["providerGateway"].is_object() {
+            let ids = value["accountIds"].as_array().ok_or("供应商网关缺少账号范围")?;
+            if ids.len() != 1 { return Err("独立供应商网关必须绑定一个账号".into()); }
+            let id = ids[0].as_str().ok_or("供应商网关账号 ID 无效")?;
+            let proxy = crate::modules::account_proxy::effective_proxy(id, effective_proxy_url_ref)?;
+            value["providerGateway"]["proxyUrl"] = json!(proxy);
+        }
+        if let Some(routes) = value["modelRouting"]["routes"].as_array_mut() {
+            for route in routes {
+                if !route["providerGateway"].is_object() { continue; }
+                let id = route["providerAccountId"].as_str().ok_or("模型路由缺少账号 ID")?;
+                let proxy = crate::modules::account_proxy::effective_proxy(id, effective_proxy_url_ref)?;
+                route["providerGateway"]["proxyUrl"] = json!(proxy);
+            }
+        }
     }
     let manifest = json!({
         "locale": app_locale,

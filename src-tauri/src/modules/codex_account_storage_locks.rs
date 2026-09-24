@@ -94,7 +94,7 @@ fn get_accounts_storage_path() -> PathBuf {
             .join(".antigravity_cockpit")
     });
     fs::create_dir_all(&data_dir).ok();
-    migrate_codex_data_if_needed(&data_dir);
+    // Local isolation edition: never auto-move/delete the upstream installation's accounts.
     data_dir.join("codex_accounts.json")
 }
 

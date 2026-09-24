@@ -25,6 +25,46 @@
   gap: 20px;
 }
 
+.codex-accounts-page {
+  zoom: var(--v4-codex-ui-scale, 1);
+}
+
+.codex-v4-layout-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-card) 86%, transparent);
+}
+.codex-v4-layout-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.codex-v4-layout-controls select {
+  min-width: 44px;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 10px;
+}
+
+/* V4 desktop density: five observable cards at a normal full-screen width. */
+@media (min-width: 1380px) {
+  .codex-accounts-grid,
+  .codex-group-entry-grid {
+    grid-template-columns: var(--v4-codex-grid-template, repeat(5, minmax(0, 1fr)));
+    gap: 12px;
+  }
+}
+
 .codex-overview-selection-bar {
   display: flex;
   flex-wrap: wrap;

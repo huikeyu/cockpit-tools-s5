@@ -1067,6 +1067,7 @@ fn delete_account_file_unlocked(account_id: &str) -> Result<(), String> {
         crate::modules::atomic_write::remove_file_locked(&path)
             .map_err(|e| format!("删除文件失败: {}", e))?;
     }
+    crate::modules::account_proxy::delete_for_removed_account(account_id)?;
     Ok(())
 }
 

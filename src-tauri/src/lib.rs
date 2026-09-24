@@ -23,6 +23,11 @@ pub fn get_app_handle() -> Option<&'static tauri::AppHandle> {
     APP_HANDLE.get()
 }
 
+/// Offline executable acceptance test; does not start the UI or contact an account provider.
+pub fn run_proxy_self_test() -> Result<serde_json::Value, String> {
+    modules::account_proxy::self_test()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -429,8 +434,7 @@ pub fn run() {
             // 初始化 Updater 插件
             #[cfg(desktop)]
             {
-                app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                // Isolation builds must not be overwritten by upstream auto-updates.
                 app.handle().plugin(tauri_plugin_process::init())?;
                 app.handle().plugin(tauri_plugin_autostart::init(
                     tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -788,6 +792,17 @@ pub fn run() {
             commands::codex_pelican::codex_pelican_delete,
             modules::codex_pelican_preview::codex_pelican_preview,
             modules::codex_pelican_preview::codex_pelican_browser,
+            commands::account_proxy::codex_get_account_proxy,
+            commands::account_proxy::codex_get_account_proxy_dashboard,
+            commands::account_proxy::codex_save_account_proxy,
+            commands::account_proxy::codex_test_account_proxy,
+            commands::account_proxy::codex_prepare_isolated_instance,
+            commands::account_proxy::codex_set_pending_auth_proxy,
+            commands::account_proxy::codex_test_pending_auth_proxy,
+            commands::account_proxy::codex_get_proxy_inventory,
+            commands::account_proxy::codex_save_proxy_inventory_entry,
+            commands::account_proxy::codex_delete_proxy_inventory_entry,
+            commands::account_proxy::codex_import_proxy_subscription,
             // Account Commands
             commands::account::list_accounts,
             commands::account::add_account,
@@ -1056,6 +1071,7 @@ pub fn run() {
             commands::codex::codex_oauth_login_start,
             commands::codex::codex_oauth_device_auth_start,
             commands::codex::codex_oauth_open_incognito_window,
+            commands::codex::codex_oauth_open_device_proxy_window,
             commands::codex::codex_oauth_login_completed,
             commands::codex::codex_oauth_submit_callback_url,
             commands::codex::codex_oauth_login_cancel,
@@ -1573,6 +1589,7 @@ pub fn run() {
                 }
             }
             RunEvent::Exit => {
+                modules::account_proxy::shutdown();
                 let first_shutdown = modules::app_lifecycle::begin_shutdown();
                 if first_shutdown {
                     commands::codex_instance::restore_mixed_model_profiles_for_app_exit();

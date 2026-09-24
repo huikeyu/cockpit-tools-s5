@@ -1597,6 +1597,8 @@ fn build_launch_command_text(
     node_path: Option<&str>,
 ) -> Result<String, String> {
     let parsed_args = modules::process::parse_extra_args(&context.extra_args);
+    let account_proxy_env = modules::account_proxy::profile_proxy(Path::new(&context.user_data_dir))?
+        .map(|proxy| modules::account_proxy::proxy_env(&proxy)).unwrap_or_default();
 
     #[cfg(not(target_os = "windows"))]
     {
@@ -1608,6 +1610,9 @@ fn build_launch_command_text(
         }
 
         let mut codex_cmd = String::new();
+        for (key, value) in &account_proxy_env {
+            codex_cmd.push_str(&format!("{}={} ", key, posix_shell_quote(value)));
+        }
         codex_cmd.push_str("CODEX_HOME=");
         codex_cmd.push_str(&posix_shell_quote(&context.user_data_dir));
         codex_cmd.push(' ');
@@ -1632,6 +1637,9 @@ fn build_launch_command_text(
     #[cfg(target_os = "windows")]
     {
         let mut command_parts = Vec::new();
+        for (key, value) in &account_proxy_env {
+            command_parts.push(format!("$env:{}={}", key, powershell_quote(value)));
+        }
         command_parts.push(format!(
             "$env:CODEX_HOME={}",
             powershell_quote(&context.user_data_dir)

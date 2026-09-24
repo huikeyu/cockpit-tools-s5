@@ -1,4 +1,12 @@
-# Cockpit Tools
+# Cockpit Tools Isolation V4 — Community Fork
+
+This repository is a source-available adaptation of [jlcodes99/cockpit-tools v1.3.59](https://github.com/jlcodes99/cockpit-tools/tree/v1.3.59), not an official upstream or OpenAI release. V4 adds account-scoped Codex proxies, encrypted proxy inventory and failover groups, Hysteria2/TUIC support, one-time V2Ray/Clash subscription import, request-chain observability, and a compact green activity view. See [features and network boundaries](V4-ISOLATION-README.md), [source build instructions](SOURCE-BUILD.md), and [V4 release notes](RELEASE-V4.md).
+
+The upstream-derived work remains under **CC BY-NC-SA 4.0**: attribution, noncommercial use, and share-alike terms apply. Publishing the source does not grant commercial-use rights. Xray-core, sing-box, and CLIProxyAPI retain their separate licenses; see [LICENSE](LICENSE).
+
+---
+
+# Cockpit Tools (upstream overview)
 
 English · [Portuguese (BR)](README.pt-br.md) · [简体中文](README.md)
 

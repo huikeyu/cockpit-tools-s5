@@ -1,4 +1,12 @@
-# Cockpit Tools
+# Cockpit Tools Isolation V4 — versão comunitária
+
+Este repositório é uma adaptação com código-fonte disponível de [jlcodes99/cockpit-tools v1.3.59](https://github.com/jlcodes99/cockpit-tools/tree/v1.3.59), não uma versão oficial do projeto original nem da OpenAI. O V4 adiciona proxies independentes por conta Codex, inventário de proxies com failover, Hysteria2/TUIC, importação pontual de assinaturas V2Ray/Clash e visualização das requisições. Consulte as [instruções de compilação](SOURCE-BUILD.md) e as [notas da versão](RELEASE-V4.md).
+
+O código derivado mantém a licença **CC BY-NC-SA 4.0**: atribuição, uso não comercial e compartilhamento pela mesma licença. A publicação do código-fonte não concede autorização para uso comercial. Os componentes de terceiros mantêm suas licenças; consulte [LICENSE](LICENSE).
+
+---
+
+# Cockpit Tools (apresentação do projeto original)
 
 [English](README.en.md)  · Portuguese (BR) · [简体中文](README.md)
 

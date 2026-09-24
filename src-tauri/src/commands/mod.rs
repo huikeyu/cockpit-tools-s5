@@ -1,4 +1,5 @@
 pub mod account;
+pub mod account_proxy;
 pub mod announcement;
 pub mod antigravity_legacy_instance;
 pub mod claude;

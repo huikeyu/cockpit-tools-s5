@@ -1,4 +1,19 @@
-# Cockpit Tools
+# Cockpit Tools Isolation V4（社区修改版）
+
+本仓库是基于 [jlcodes99/cockpit-tools v1.3.59](https://github.com/jlcodes99/cockpit-tools/tree/v1.3.59) 的独立修改版，不是上游项目或 OpenAI 的官方版本。V4 面向 Windows x64 的 Codex 多账号 API 服务：每个账号绑定自己的代理网络，添加账号时也先配置代理；代理不可用时阻断该账号请求，不回退直连。
+
+V4 新增代理库存与线路组故障接管、VLESS/Reality、Hysteria2、TUIC 等协议支持、一次性 V2Ray/Clash 订阅导入、账号请求链路详情和按请求频率变化的绿色呼吸灯。默认 Codex/ChatGPT 桌面客户端仍使用电脑原有资料目录；逐账号“隔离启动”才使用独立目录。客户端登录、更新等非模型流量不属于账号池代理的保障范围。
+
+- [V4 功能与网络边界](V4-ISOLATION-README.md)
+- [从源码构建](SOURCE-BUILD.md)
+- [V4 发布说明](RELEASE-V4.md)
+- [修改版许可与第三方说明](LICENSE)
+
+**许可提醒：**上游为 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)，要求署名、非商业使用及同方式共享；公开源码并不意味着获得商用授权。内置的 Xray-core、sing-box、CLIProxyAPI 各自保留原许可证。请勿同时用本版与原版 Cockpit 管理同一个默认客户端。
+
+---
+
+# Cockpit Tools（上游项目介绍）
 
 [English](README.en.md) · [Portuguese (BR)](README.pt-br.md) · 简体中文
 

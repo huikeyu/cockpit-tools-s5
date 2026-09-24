@@ -2247,7 +2247,8 @@ async fn send_upstream_request_with_authorization_url(
 ) -> Result<reqwest::Response, String> {
     let method =
         Method::from_bytes(method.as_bytes()).map_err(|e| format!("不支持的请求方法: {}", e))?;
-    let client = upstream_http_client(upstream_proxy_url, connect_timeout)?;
+    let account_proxy = crate::modules::account_proxy::effective_proxy(&account.id, upstream_proxy_url)?;
+    let client = upstream_http_client(account_proxy.as_deref(), connect_timeout)?;
     let upstream_body = build_account_scoped_upstream_body(
         target,
         body,

@@ -131,6 +131,38 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
       "browser",
     );
     const [deviceCodeCopied, setDeviceCodeCopied] = useState(false);
+    const [pendingAuthProxyInput, setPendingAuthProxyInput] = useState("");
+    const [pendingAuthProxyError, setPendingAuthProxyError] = useState<string | null>(null);
+    const [pendingAuthProxyTest, setPendingAuthProxyTest] = useState<string | null>(null);
+    const [pendingAuthProxyTesting, setPendingAuthProxyTesting] = useState(false);
+    const handleTestPendingAuthProxy = async () => {
+      if (!pendingAuthProxyInput.trim() || pendingAuthProxyTesting) return;
+      setPendingAuthProxyError(null);
+      setPendingAuthProxyTest(null);
+      setPendingAuthProxyTesting(true);
+      try {
+        const result = await codexService.testCodexPendingAuthProxy(
+          addTab === "oauth" ? oauthLoginIdRef.current : null,
+          pendingAuthProxyInput.trim(),
+        );
+        setPendingAuthProxyTest(`出口 IP：${result.exitIp} · ${result.latencyMs} ms`);
+      } catch (error) {
+        setPendingAuthProxyError(String(error).replace(/^Error:\s*/, ""));
+      } finally {
+        setPendingAuthProxyTesting(false);
+      }
+    };
+    useEffect(() => {
+      if (showAddModal) return;
+      setPendingAuthProxyInput("");
+      setPendingAuthProxyError(null);
+      setPendingAuthProxyTest(null);
+      void codexService.setCodexPendingAuthProxy(null, null).catch(() => {});
+    }, [showAddModal]);
+    useEffect(() => {
+      setPendingAuthProxyError(null);
+      setPendingAuthProxyTest(null);
+    }, [pendingAuthProxyInput]);
     const [oauthTokenExchangeRetryVisible, setOauthTokenExchangeRetryVisible] =
       useState(false);
     const [switching, setSwitching] = useState<string | null>(null);
@@ -1504,6 +1536,11 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
             return;
           }
           oauthLoginIdRef.current = loginId ?? null;
+          if (loginId && pendingAuthProxyInput.trim()) {
+            codexService
+              .setCodexPendingAuthProxy(loginId, pendingAuthProxyInput.trim())
+              .catch((error) => setPendingAuthProxyError(String(error).replace(/^Error:\s*/, "")));
+          }
           if (
             typeof authUrl === "string" &&
             authUrl.length > 0 &&
@@ -1525,7 +1562,7 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
           }
           handleOauthPrepareError(e);
         });
-    }, [handleOauthPrepareError, oauthLog]);
+    }, [handleOauthPrepareError, oauthLog, pendingAuthProxyInput]);
   
     useEffect(() => {
       if (
@@ -1676,20 +1713,28 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
   
     const handleOpenOauthUrl = async () => {
       if (!oauthUrl) return;
+      if (!pendingAuthProxyInput.trim()) {
+        setPendingAuthProxyError("请先填写添加账号代理；未设置时不会打开浏览器授权");
+        return;
+      }
       try {
-        await openUrl(oauthUrl);
-      } catch {
-        await navigator.clipboard.writeText(oauthUrl).catch(() => {});
-        setOauthUrlCopied(true);
-        setTimeout(() => setOauthUrlCopied(false), 1200);
+        await codexService.setCodexPendingAuthProxy(oauthLoginIdRef.current, pendingAuthProxyInput.trim() || null);
+        await codexService.openCodexOAuthIncognitoWindow(oauthUrl);
+      } catch (error) {
+        setPendingAuthProxyError(String(error).replace(/^Error:\s*/, ""));
       }
     };
   
     const handleOpenOauthIncognitoWindow = async () => {
       if (!oauthUrl) return;
+      if (!pendingAuthProxyInput.trim()) {
+        setPendingAuthProxyError("请先填写添加账号代理；未设置时不会打开授权窗口");
+        return;
+      }
       setAddStatus("idle");
       setAddMessage("");
       try {
+        await codexService.setCodexPendingAuthProxy(oauthLoginIdRef.current, pendingAuthProxyInput.trim() || null);
         await codexService.openCodexOAuthIncognitoWindow(oauthUrl);
       } catch (error) {
         setAddStatus("error");
@@ -1721,6 +1766,7 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
       oauthLoginIdRef.current = null;
       setOauthUrl(null);
       try {
+        await codexService.setCodexPendingAuthProxy(null, pendingAuthProxyInput.trim() || null);
         const info = await codexService.startCodexDeviceAuth();
         oauthLoginIdRef.current = info.loginId;
         oauthActiveRef.current = true;
@@ -1729,6 +1775,7 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
         setAddStatus("idle");
         setAddMessage("");
       } catch (error) {
+        setPendingAuthProxyError(String(error).replace(/^Error:\s*/, ""));
         setDeviceAuthError(String(error).replace(/^Error:\s*/, ""));
       } finally {
         setDeviceAuthStarting(false);
@@ -1767,9 +1814,9 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
     };
   
     const handleOpenDeviceAuthUrl = async () => {
-      if (!deviceAuthInfo?.verificationUrl) return;
+      if (!deviceAuthInfo?.loginId) return;
       try {
-        await openUrl(deviceAuthInfo.verificationUrl);
+        await codexService.openCodexDeviceProxyWindow(deviceAuthInfo.loginId);
       } catch (error) {
         setDeviceAuthError(String(error).replace(/^Error:\s*/, ""));
       }
@@ -1938,6 +1985,12 @@ export function useCodexAccountsOAuthController(context: Pick<ReturnType<typeof 
     oauthTimeoutInfo,
     oauthUrl,
     oauthUrlCopied,
+    pendingAuthProxyError,
+    pendingAuthProxyInput,
+    pendingAuthProxyTest,
+    pendingAuthProxyTesting,
+    handleTestPendingAuthProxy,
+    setPendingAuthProxyInput,
     pendingApiKeyFunCodexPrefillRef,
     quickSwitchAccount,
     quickSwitchAccountId,

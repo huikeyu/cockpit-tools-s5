@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/account-proxy",
     "src-tauri",
     "crates/cockpit-core",
     "crates/cockpit-cli",
@@ -48,3 +49,16 @@ rsa = "0.9"
 serde_urlencoded = "0.7"
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 junction = "2.0"
+
+# Development editions: keep optimized Windows builds within a modest memory budget.
+[profile.release]
+opt-level = 1
+debug = 0
+codegen-units = 256
+strip = "debuginfo"
+incremental = true
+
+# Upstream puts a very large desktop app in one crate. Keep its development
+# edition unoptimized; dependencies (TLS, HTTP, crypto, GUI) remain optimized.
+[profile.release.package.cockpit-tools]
+opt-level = 0

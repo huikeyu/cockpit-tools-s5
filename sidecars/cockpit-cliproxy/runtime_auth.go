@@ -1014,12 +1014,28 @@ func (p *sidecarRoundTripperProvider) RoundTripperFor(auth *coreauth.Auth) http.
 	}
 	transport, _, err := proxyutil.BuildHTTPTransport(proxyURL)
 	if err != nil || transport == nil {
-		return nil
+		return blockedProxyTransport{}
 	}
 	p.mu.Lock()
 	p.cache[proxyURL] = transport
 	p.mu.Unlock()
 	return transport
+}
+
+// Never interpret a configured-but-invalid proxy as permission to go direct.
+type blockedProxyTransport struct{}
+
+func (blockedProxyTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("account proxy unavailable; direct fallback is disabled")
+}
+
+var providerProxyTransports = newSidecarRoundTripperProvider()
+
+func providerGatewayHTTPClient(proxyURL string) *http.Client {
+	if strings.TrimSpace(proxyURL) == "" {
+		return http.DefaultClient
+	}
+	return &http.Client{Transport: providerProxyTransports.RoundTripperFor(&coreauth.Auth{ProxyURL: proxyURL})}
 }
 
 type executorRuntime interface {

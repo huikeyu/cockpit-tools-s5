@@ -147,9 +147,7 @@ async fn request_remote_account_check(
         });
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
+    let client = crate::modules::account_proxy::client(&account.id, Duration::from_secs(10))
         .map_err(|error| CodexAccountCheckError {
             kind: CodexAccountCheckErrorKind::Network,
             message: format!("创建官方账号检查客户端失败: {}", error),
@@ -230,4 +228,3 @@ async fn fetch_remote_account_profile(
         .map_err(|error| error.message)?;
     Ok(parse_account_profile_from_check_response(&payload, account))
 }
-

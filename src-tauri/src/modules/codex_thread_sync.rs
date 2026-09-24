@@ -429,6 +429,8 @@ fn collect_instances() -> Result<Vec<CodexSyncInstance>, String> {
 
     for instance in store.instances {
         let user_data_dir = instance.user_data_dir.trim();
+        // Isolated account profiles must not receive or publish other accounts' history.
+        if modules::account_proxy::is_isolated_profile(Path::new(user_data_dir)) { continue; }
         if user_data_dir.is_empty() {
             continue;
         }

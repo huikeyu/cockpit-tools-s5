@@ -26,6 +26,11 @@ fn start_codex_default_internal(
     extra_args: &[String],
     fast_after_close: bool,
 ) -> Result<u32, String> {
+    let default_home = crate::modules::codex_instance::get_default_codex_home()?;
+    if dirs::home_dir().map(|p| p.join(".codex")).as_ref() != Some(&default_home)
+        || crate::modules::account_proxy::profile_proxy(&default_home)?.is_some() {
+        return start_codex_with_args(&default_home.to_string_lossy(), extra_args);
+    }
     #[cfg(not(target_os = "windows"))]
     let _ = fast_after_close;
 

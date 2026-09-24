@@ -47,7 +47,7 @@ pub fn rebuild_thread_metadata(codex_home: &Path) -> Result<(), String> {
         codex_home.display()
     ));
     let spawn_started = Instant::now();
-    let mut child = build_app_server_command(&executable, codex_home)
+    let mut child = build_app_server_command(&executable, codex_home)?
         .spawn()
         .map_err(|error| {
             format!(
@@ -209,7 +209,7 @@ pub fn delete_threads(codex_home: &Path, session_ids: &[String]) -> Result<usize
         ));
     }
     let executable = official_app_server_executable()?;
-    let mut child = build_app_server_command(&executable, codex_home)
+    let mut child = build_app_server_command(&executable, codex_home)?
         .spawn()
         .map_err(|error| {
             format!(
@@ -468,9 +468,12 @@ fn parent_file_name_eq(path: &Path, expected: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn build_app_server_command(executable: &Path, codex_home: &Path) -> Command {
+fn build_app_server_command(executable: &Path, codex_home: &Path) -> Result<Command, String> {
     let mut command = Command::new(executable);
     crate::modules::process::apply_managed_proxy_env_to_command(&mut command);
+    if let Some(proxy) = crate::modules::account_proxy::profile_proxy(codex_home)? {
+        command.envs(crate::modules::account_proxy::proxy_env(&proxy));
+    }
     command
         .args(["app-server", "--listen", "stdio://"])
         .env("CODEX_HOME", codex_home)
@@ -484,7 +487,7 @@ fn build_app_server_command(executable: &Path, codex_home: &Path) -> Command {
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
-    command
+    Ok(command)
 }
 
 fn send_request(stdin: &mut impl Write, request: JsonValue) -> Result<(), String> {

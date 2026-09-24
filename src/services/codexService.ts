@@ -482,6 +482,18 @@ export async function openCodexOAuthIncognitoWindow(authUrl: string): Promise<vo
   await invoke('codex_oauth_open_incognito_window', { authUrl });
 }
 
+export async function openCodexDeviceProxyWindow(loginId: string): Promise<void> {
+  await invoke('codex_oauth_open_device_proxy_window', { loginId });
+}
+
+export async function setCodexPendingAuthProxy(loginId: string | null, proxyUri: string | null): Promise<string | null> {
+  return await invoke('codex_set_pending_auth_proxy', { loginId, proxyUri });
+}
+
+export async function testCodexPendingAuthProxy(loginId: string | null, proxyUri: string): Promise<{ exitIp: string; latencyMs: number }> {
+  return await invoke('codex_test_pending_auth_proxy', { loginId, proxyUri });
+}
+
 /** 新 OAuth 流程：完成登录 */
 export async function completeCodexOAuthLogin(
   loginId: string,

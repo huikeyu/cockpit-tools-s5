@@ -106,6 +106,7 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
     maskAccountText,
     newManagedProviderNameInput,
     oauthAccounts,
+    pendingAuthProxyInput,
     oauthBindingAccount,
     oauthBindingAutoSwitch,
     oauthBindingHourlyReserveDraft,
@@ -1583,6 +1584,14 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
      * 目录里，因此多实例必须由用户指定读取哪个实例。
      */
     const handleImportFromLocal = async () => {
+      try {
+        if (!pendingAuthProxyInput.trim()) throw new Error("请先为导入账号指定独立代理");
+        await codexService.setCodexPendingAuthProxy(null, pendingAuthProxyInput.trim());
+      } catch (error) {
+        page.setAddStatus("error");
+        page.setAddMessage(String(error).replace(/^Error:\s*/, ""));
+        return;
+      }
       page.setAddStatus("loading");
       page.setAddMessage(t("codex.import.importing", "正在导入本地账号..."));
       const instances = await codexInstanceStore.refreshInstances();
@@ -2590,6 +2599,14 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
     }, []);
   
     const handleApiKeyLogin = async () => {
+      try {
+        if (!pendingAuthProxyInput.trim()) throw new Error("请先为 API Key 账号指定独立代理");
+        await codexService.setCodexPendingAuthProxy(null, pendingAuthProxyInput.trim());
+      } catch (error) {
+        page.setAddStatus("error");
+        page.setAddMessage(String(error).replace(/^Error:\s*/, ""));
+        return;
+      }
       const validation = validateApiKeyCredentialInputs(
         apiKeyInput,
         apiBaseUrlInput,
@@ -2677,25 +2694,8 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
               ...buildCodexModelProviderAccountSnapshot(savedProvider, selectedManagedProviderApiKey?.name),
               accountName: providerPayload.accountName || savedProvider.name,
             };
-            try {
-              const usageSummary = await queryCodexModelProviderUsage({
-                baseUrl: savedProvider.baseUrl,
-                apiKey: validation.apiKey,
-                integrationType: savedProvider.integrationType ?? null,
-              });
-              if (
-                (usageSummary.mode === "sub2api" ||
-                  usageSummary.mode === "new_api") &&
-                usageSummary.mode !== savedProvider.integrationType
-              ) {
-                await saveCodexModelProviderDetectedIntegrationType(
-                  savedProvider.id,
-                  usageSummary.mode,
-                );
-              }
-            } catch (usageErr) {
-              console.warn("[CodexModelProviders] 额度类型探测失败", usageErr);
-            }
+            // Usage discovery is deferred until the account ID has a persisted
+            // proxy binding. A pre-save query would have no account route.
             await reloadManagedProviders();
           } catch (providerErr) {
             console.warn(
@@ -2790,6 +2790,11 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
         page.setAddMessage(
           t("common.shared.token.empty", "请输入 Token 或 JSON"),
         );
+        return;
+      }
+      if (payloads.length !== 1) {
+        page.setAddStatus("error");
+        page.setAddMessage("一次只能导入一个账号；请为每个账号分别填写自己的代理");
         return;
       }
   
@@ -2909,6 +2914,14 @@ export function useCodexAccountsAccessController(context: CodexAccountsAccessCon
         page.setAddMessage(
           t("common.shared.token.empty", "请输入 Token 或 JSON"),
         );
+        return;
+      }
+      try {
+        if (!pendingAuthProxyInput.trim()) throw new Error("请先为此账号填写独立代理");
+        await codexService.setCodexPendingAuthProxy(null, pendingAuthProxyInput.trim());
+      } catch (error) {
+        page.setAddStatus("error");
+        page.setAddMessage(`添加账号代理失败：${String(error).replace(/^Error:\s*/, "")}`);
         return;
       }
       const webSessions = findCodexWebSessionImports(trimmed);

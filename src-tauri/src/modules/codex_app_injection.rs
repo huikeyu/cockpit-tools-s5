@@ -880,7 +880,7 @@ async fn fetch_quota(
 
 /// 查询绑定账号的 DeepSeek 余额；失败时保留上一次的有效快照，不清空已显示的额度。
 async fn fetch_deepseek_balance(
-    client: &Client,
+    _client: &Client,
     account: &CodexAccount,
 ) -> Option<DeepSeekBalanceSnapshot> {
     let url = deepseek_balance_endpoint(account)?;
@@ -889,7 +889,8 @@ async fn fetch_deepseek_balance(
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())?;
-    match query_deepseek_balance_snapshot(client, &url, api_key).await {
+    let client = crate::modules::account_proxy::client(&account.id, DEEPSEEK_BALANCE_QUERY_TIMEOUT).ok()?;
+    match query_deepseek_balance_snapshot(&client, &url, api_key).await {
         Ok(snapshot) => Some(snapshot),
         Err(error) => {
             logger::log_warn(&format!(

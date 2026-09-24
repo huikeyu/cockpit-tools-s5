@@ -389,7 +389,8 @@ func (s *relayServer) handleProviderGatewayRequest(c *gin.Context, gateway *prov
 		applyOpenCodeSessionHeader(req.Header, c.Request.Header, body)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	client := providerGatewayHTTPClient(gateway.ProxyURL)
+	resp, err := client.Do(req)
 	if err != nil {
 		writeAPIError(c, http.StatusBadGateway, err.Error(), "bad_gateway")
 		return

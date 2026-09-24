@@ -12,10 +12,10 @@
 /// 显示在弹框里（地址由官方生成，不做改写），不再弹浏览器；关闭时完全走官方原生流程。
 #[tauri::command]
 pub fn start_codex_temp_login(
-    app: AppHandle,
-    intercept_auth_url: bool,
+    _app: AppHandle,
+    _intercept_auth_url: bool,
 ) -> Result<crate::modules::codex_temp_login::CodexTempLoginSession, String> {
-    crate::modules::codex_temp_login::start(app, intercept_auth_url)
+    Err("隔离版请使用添加账号窗口中的 OAuth 代理授权；官方客户端临时登录无法保证浏览器出口".into())
 }
 
 /// 取消官方客户端登录（仍会关闭客户端并清理临时 profile）。
@@ -28,8 +28,8 @@ pub fn cancel_codex_temp_login(session_id: String) -> Result<(), String> {
 ///
 /// 地址由官方客户端生成并原样保存，这里只校验官方域名后交给系统浏览器。
 #[tauri::command]
-pub fn open_codex_temp_login_auth_url(app: AppHandle, url: String) -> Result<(), String> {
-    crate::modules::codex_temp_login::open_captured_auth_url(&app, url.as_str())
+pub fn open_codex_temp_login_auth_url(_app: AppHandle, _url: String) -> Result<(), String> {
+    Err("隔离版已停用默认浏览器授权入口，请使用代理 OAuth 窗口".into())
 }
 
 /// 手动触发一次残留清理（正常由启动巡检与定期巡检自动完成）。

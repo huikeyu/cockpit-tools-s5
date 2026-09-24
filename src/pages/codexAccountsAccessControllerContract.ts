@@ -62,6 +62,7 @@ export type CodexAccountsAccessControllerContext = Pick<ReturnType<typeof useCod
   | "maskAccountText"
   | "newManagedProviderNameInput"
   | "oauthAccounts"
+  | "pendingAuthProxyInput"
   | "oauthBindingAccount"
   | "oauthBindingAutoSwitch"
   | "oauthBindingHourlyReserveDraft"

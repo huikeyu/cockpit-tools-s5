@@ -349,6 +349,7 @@ func (s *apiKeyPriorityStateStore) reloadIfChanged() {
 }
 
 type providerGatewaySpec struct {
+	ProxyURL           string                                    `json:"proxyUrl,omitempty"`
 	BaseURL            string                                    `json:"baseUrl"`
 	APIKey             string                                    `json:"apiKey"`
 	UpstreamModel      string                                    `json:"upstreamModel"`
@@ -439,27 +440,27 @@ type usagePayload struct {
 	Alias     string `json:"alias,omitempty"`
 	// RequestedModel keeps the client-requested model (route namespace intact)
 	// while Model/UpstreamModel carry the model that actually reached upstream.
-	RequestedModel   string       `json:"requestedModel,omitempty"`
-	UpstreamModel    string       `json:"upstreamModel,omitempty"`
-	AccountID        string       `json:"accountId,omitempty"`
-	AccountEmail     string       `json:"accountEmail,omitempty"`
-	AuthID           string       `json:"authId,omitempty"`
-	APIKeyID         string       `json:"apiKeyId,omitempty"`
-	APIKeyLabel      string       `json:"apiKeyLabel,omitempty"`
-	ClientInstanceID string       `json:"clientInstanceId,omitempty"`
-	RequestKind      string       `json:"requestKind,omitempty"`
-	ServiceTier      string       `json:"serviceTier,omitempty"`
-	ReasoningEffort  string       `json:"reasoningEffort,omitempty"`
-	Success          bool         `json:"success"`
-	Status           int          `json:"status,omitempty"`
-	ErrorCategory    string       `json:"errorCategory,omitempty"`
-	ErrorMessage     string       `json:"errorMessage,omitempty"`
-	LatencyMS        int64        `json:"latencyMs,omitempty"`
+	RequestedModel   string `json:"requestedModel,omitempty"`
+	UpstreamModel    string `json:"upstreamModel,omitempty"`
+	AccountID        string `json:"accountId,omitempty"`
+	AccountEmail     string `json:"accountEmail,omitempty"`
+	AuthID           string `json:"authId,omitempty"`
+	APIKeyID         string `json:"apiKeyId,omitempty"`
+	APIKeyLabel      string `json:"apiKeyLabel,omitempty"`
+	ClientInstanceID string `json:"clientInstanceId,omitempty"`
+	RequestKind      string `json:"requestKind,omitempty"`
+	ServiceTier      string `json:"serviceTier,omitempty"`
+	ReasoningEffort  string `json:"reasoningEffort,omitempty"`
+	Success          bool   `json:"success"`
+	Status           int    `json:"status,omitempty"`
+	ErrorCategory    string `json:"errorCategory,omitempty"`
+	ErrorMessage     string `json:"errorMessage,omitempty"`
+	LatencyMS        int64  `json:"latencyMs,omitempty"`
 	// TurnStateLength/TurnStateClass 来自上游响应头的旁路观测；state 原文不保存。
-	TurnStateLength *int   `json:"turnStateLength,omitempty"`
-	TurnStateClass  string `json:"turnStateClass,omitempty"`
-	Usage            usageDetails `json:"usage"`
-	RequestedAtMS    int64        `json:"requestedAtMs,omitempty"`
+	TurnStateLength *int         `json:"turnStateLength,omitempty"`
+	TurnStateClass  string       `json:"turnStateClass,omitempty"`
+	Usage           usageDetails `json:"usage"`
+	RequestedAtMS   int64        `json:"requestedAtMs,omitempty"`
 }
 
 type requestDiagnosticPayload struct {

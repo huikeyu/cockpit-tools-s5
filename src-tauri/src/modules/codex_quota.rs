@@ -728,7 +728,7 @@ fn build_subscription_headers(
 async fn fetch_subscription_account_check(
     account: &CodexAccount,
 ) -> Result<SubscriptionStatusSnapshot, String> {
-    let client = reqwest::Client::new();
+    let client = crate::modules::account_proxy::client(&account.id, std::time::Duration::from_secs(20))?;
     let headers =
         build_subscription_headers(account, "/backend-api/accounts/check/v4-2023-04-27", None)?;
     let timezone_offset_min = current_chatgpt_timezone_offset_min();
@@ -778,7 +778,7 @@ async fn fetch_subscriptions_snapshot(
     account: &CodexAccount,
     account_id: &str,
 ) -> Result<SubscriptionStatusSnapshot, String> {
-    let client = reqwest::Client::new();
+    let client = crate::modules::account_proxy::client(&account.id, std::time::Duration::from_secs(20))?;
     let headers = build_subscription_headers(account, "/backend-api/subscriptions", None)?;
 
     let response = client
@@ -1155,7 +1155,7 @@ async fn fetch_new_api_quota(account: &CodexAccount) -> Result<FetchQuotaResult,
         .filter(|value| !value.is_empty())
         .ok_or("Cockpit Api 账号缺少 OPENAI_API_KEY")?;
     let profile_url = build_new_api_profile_url(account)?;
-    let client = reqwest::Client::new();
+    let client = crate::modules::account_proxy::client(&account.id, std::time::Duration::from_secs(20))?;
     let response = client
         .get(&profile_url)
         .bearer_auth(api_key)
@@ -1333,10 +1333,7 @@ async fn send_codex_api_request_with_agent_auth_base_url(
     let account_id = account.account_id.clone().or_else(|| {
         codex_account::extract_chatgpt_account_id_from_access_token(&account.tokens.access_token)
     });
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .build()
-        .map_err(|error| format!("创建 Codex 上游客户端失败: {}", error))?;
+    let client = crate::modules::account_proxy::client(&account.id, std::time::Duration::from_secs(20))?;
     let mut current = account.clone();
     let mut expected_task_id: Option<String> = None;
 

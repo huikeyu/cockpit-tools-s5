@@ -2180,6 +2180,19 @@ pub fn start_codex_with_args_and_env(
     extra_args: &[String],
     extra_env: &[(String, String)],
 ) -> Result<u32, String> {
+    let mut scoped_args = extra_args.to_vec();
+    let mut scoped_env = extra_env.to_vec();
+    if let Some(proxy) = crate::modules::account_proxy::profile_proxy(Path::new(codex_home))? {
+        if scoped_args.iter().any(|a| a.starts_with("--proxy-") || a == "--no-proxy-server") {
+            return Err("账号已绑定独立代理，请移除实例附加参数中的代理覆盖选项".into());
+        }
+        scoped_args.push(format!("--proxy-server={proxy}"));
+        scoped_args.push("--proxy-bypass-list=localhost;127.0.0.1;[::1]".into());
+        scoped_args.push("--disable-quic".into());
+        scoped_env.extend(crate::modules::account_proxy::proxy_env(&proxy));
+    }
+    let extra_args = scoped_args.as_slice();
+    let extra_env = scoped_env.as_slice();
     #[cfg(target_os = "macos")]
     {
         let app_root = resolve_codex_launch_path()

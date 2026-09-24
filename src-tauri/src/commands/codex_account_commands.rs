@@ -1719,7 +1719,10 @@ pub async fn import_codex_access_token_account(
     name: String,
     access_token: String,
 ) -> Result<CodexAccount, String> {
+    crate::modules::account_proxy::pending_endpoint(None)?;
     let account = codex_account::import_access_token_account(name, access_token)?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
     let account_id = account.id.clone();
     if let Err(error) = codex_account::refresh_account_profile(&account_id).await {
         logger::log_warn(&format!(
@@ -1756,6 +1759,7 @@ pub async fn import_codex_from_local(
     app: AppHandle,
     instance_id: Option<String>,
 ) -> Result<CodexAccount, String> {
+    crate::modules::account_proxy::pending_endpoint(None)?;
     let base_dir = resolve_codex_local_import_dir(instance_id.as_deref())?;
     logger::log_info(&format!(
         "Codex 获取本地账号: instance_id={}, profile_dir={}",
@@ -1763,6 +1767,8 @@ pub async fn import_codex_from_local(
         base_dir.display()
     ));
     let account = codex_account::import_from_local_at(&base_dir)?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
     reactivate_imported_current_if_needed(std::slice::from_ref(&account)).await;
     let mut accounts = refresh_imported_codex_accounts(&app, vec![account]).await;
     accounts
@@ -1776,7 +1782,25 @@ pub async fn import_codex_from_json(
     app: AppHandle,
     json_content: String,
 ) -> Result<Vec<CodexAccount>, String> {
+    crate::modules::account_proxy::pending_endpoint(None)?;
+    let nonempty_lines = json_content.lines().filter(|line| !line.trim().is_empty()).count();
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_content) {
+        let count = parsed.as_array().map(Vec::len)
+            .or_else(|| parsed.get("accounts").and_then(serde_json::Value::as_array).map(Vec::len));
+        if count.is_some_and(|count| count != 1) {
+            return Err("一次只能导入一个账号，请为每个账号分别指定代理".into());
+        }
+    } else if nonempty_lines > 1 {
+        return Err("一次只能导入一个账号，请为每个账号分别指定代理".into());
+    }
     let accounts = codex_account::import_from_json(&json_content).await?;
+    if accounts.len() != 1 {
+        for account in &accounts {
+            crate::modules::account_proxy::require_proxy(&account.id)?;
+        }
+        return Err("一次只能导入一个账号，请为每个账号分别指定代理".into());
+    }
+    crate::modules::account_proxy::promote_pending(None, &accounts[0].id)?;
     reactivate_imported_current_if_needed(&accounts).await;
     Ok(refresh_imported_codex_accounts(&app, accounts).await)
 }
@@ -1792,24 +1816,19 @@ pub fn export_codex_accounts(account_ids: Vec<String>) -> Result<String, String>
 /// 直导路径：只落盘账号，不做导入前/导入后额度检测，避免单账号也因网络刷新变慢。
 #[tauri::command]
 pub async fn import_codex_from_files(
-    app: AppHandle,
-    file_paths: Vec<String>,
+    _app: AppHandle,
+    _file_paths: Vec<String>,
 ) -> Result<codex_account::CodexFileImportResult, String> {
-    let result = codex_account::import_from_files(file_paths).await?;
-    reactivate_imported_current_if_needed(&result.imported).await;
-    if !result.imported.is_empty() {
-        let _ = crate::modules::tray::update_tray_menu(&app);
-    }
-    Ok(result)
+    Err("隔离版暂不支持批量文件导入；请逐个使用 Token/JSON 导入并指定独立代理".into())
 }
 
 #[tauri::command]
 pub fn start_codex_batch_import_from_files(
-    app: AppHandle,
-    file_paths: Vec<String>,
-    check_quota: bool,
+    _app: AppHandle,
+    _file_paths: Vec<String>,
+    _check_quota: bool,
 ) -> Result<codex_account::CodexBatchImportStartResult, String> {
-    codex_account::start_codex_batch_import_from_files(app, file_paths, check_quota)
+    Err("隔离版暂不支持批量文件导入；请逐个指定账号代理".into())
 }
 
 #[tauri::command]
@@ -1957,6 +1976,7 @@ pub async fn refresh_codex_quotas_batch(
 async fn save_codex_oauth_tokens(
     tokens: CodexTokens,
     reauth_account_id: Option<&str>,
+    login_id: &str,
 ) -> Result<CodexAccount, String> {
     let account = if let Some(account_id) = reauth_account_id.and_then(|value| {
         let trimmed = value.trim();
@@ -1970,6 +1990,7 @@ async fn save_codex_oauth_tokens(
     } else {
         codex_account::upsert_account(tokens)?
     };
+    crate::modules::account_proxy::promote_pending(Some(login_id), &account.id)?;
 
     // 旧官方客户端可能仍持有同一账号的旧 auth.json。普通新增授权使用刚落库的
     // 凭据直接查询配额，避免 live authority 把新 Token 覆盖回旧 Token；重新授权
@@ -2035,6 +2056,14 @@ pub fn codex_oauth_open_incognito_window(
     codex_oauth::open_incognito_oauth_window(&app_handle, &auth_url)
 }
 
+#[tauri::command]
+pub fn codex_oauth_open_device_proxy_window(
+    app_handle: AppHandle,
+    login_id: String,
+) -> Result<(), String> {
+    codex_oauth::open_device_verification_window(&app_handle, &login_id)
+}
+
 /// OAuth：浏览器授权完成后按 loginId 完成登录
 #[tauri::command]
 pub async fn codex_oauth_login_completed(
@@ -2058,7 +2087,7 @@ pub async fn codex_oauth_login_completed(
             return Err(e);
         }
     };
-    let account = save_codex_oauth_tokens(tokens, reauth_account_id.as_deref()).await?;
+    let account = save_codex_oauth_tokens(tokens, reauth_account_id.as_deref(), &login_id).await?;
     logger::log_info(&format!(
         "Codex OAuth completed 命令成功: login_id={}, duration_ms={}, account_id={}, account_email={}",
         login_id,
@@ -2110,6 +2139,7 @@ pub async fn add_codex_account_with_token(
     access_token: String,
     refresh_token: Option<String>,
 ) -> Result<CodexAccount, String> {
+    crate::modules::account_proxy::pending_endpoint(None)?;
     let tokens = CodexTokens {
         id_token,
         access_token,
@@ -2117,6 +2147,7 @@ pub async fn add_codex_account_with_token(
     };
 
     let account = codex_account::upsert_account(tokens)?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
 
     // 刷新配额
     if let Err(e) = codex_quota::refresh_account_quota(&account.id).await {
@@ -2144,6 +2175,7 @@ pub fn add_codex_account_with_api_key(
     account_name: Option<String>,
     api_model_context_windows: Option<std::collections::HashMap<String, i64>>,
 ) -> Result<CodexAccount, String> {
+    crate::modules::account_proxy::pending_endpoint(None)?;
     let account = codex_account::upsert_api_key_account(
         api_key,
         api_base_url,
@@ -2160,6 +2192,7 @@ pub fn add_codex_account_with_api_key(
         account_name,
         api_model_context_windows,
     )?;
+    crate::modules::account_proxy::promote_pending(None, &account.id)?;
     codex_account::load_account(&account.id).ok_or_else(|| "账号保存后无法读取".to_string())
 }
 

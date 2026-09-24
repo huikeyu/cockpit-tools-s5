@@ -328,11 +328,7 @@ async fn register_agent_identity_task_with_base_url(
 ) -> Result<String, String> {
     let key = agent_identity_key(account)?;
     let (timestamp, signature) = sign_task_registration(&key, chrono::Utc::now());
-    let client = reqwest::Client::builder()
-        .timeout(AGENT_IDENTITY_TASK_REGISTRATION_TIMEOUT)
-        .connect_timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|error| format!("创建 Agent Identity task 注册客户端失败: {}", error))?;
+    let client = crate::modules::account_proxy::client(&account.id, AGENT_IDENTITY_TASK_REGISTRATION_TIMEOUT)?;
     let url = format!(
         "{}/v1/agent/{}/task/register",
         base_url.trim_end_matches('/'),

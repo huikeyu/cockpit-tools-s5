@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Cockpit Tools",
+  "productName": "Cockpit Tools Isolation V4",
   "version": "1.3.59",
-  "identifier": "com.jlcodes.cockpit-tools",
+  "identifier": "com.local.cockpit-tools.isolation.v2",
   "build": {
     "beforeDevCommand": "node scripts/prepare-tauri.cjs && npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Cockpit Tools",
+        "title": "Cockpit Tools Isolation V4",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -49,14 +49,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "externalBin": [
       "../sidecars/cockpit-cliproxy/bin/cockpit-cliproxy"
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser",
-        "installerHooks": "./windows/nsis/installer-hooks.nsh"
+        "installMode": "currentUser"
       }
     },
     "linux": {
@@ -78,6 +77,17 @@
       "icons/icon.ico"
     ],
     "resources": {
+      "../LICENSE": "LICENSE",
+      "../V4-ISOLATION-README.md": "V4-ISOLATION-README.md",
+      "../V4-START-HERE.md": "V4-START-HERE.md",
+      "../V4-HANDOFF.md": "V4-HANDOFF.md",
+      "../sidecars/cockpit-cliproxy/third_party/CLIProxyAPI/LICENSE": "CLIProxyAPI-LICENSE",
+      "proxy-core/xray.exe": "proxy-core/xray.exe",
+      "proxy-core/LICENSE": "proxy-core/LICENSE",
+      "proxy-core/sing-box.exe": "proxy-core/sing-box.exe",
+      "proxy-core/sing-box-LICENSE": "proxy-core/sing-box-LICENSE",
+      "proxy-core/sing-box-1.14.1-source.zip": "proxy-core/sing-box-1.14.1-source.zip",
+      "proxy-core/GPL-3.0.txt": "proxy-core/GPL-3.0.txt",
       "../scripts/claude-desktop-auth-helper.cjs": "scripts/claude-desktop-auth-helper.cjs",
       "../src/assets/icons/antigravity-menu.png": "native-menu-icons/antigravity-menu.png",
       "../src/assets/icons/claude.png": "native-menu-icons/claude.png",
@@ -105,9 +115,7 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "cockpit-tools",
-          "cockpittools",
-          "zcode"
+          "cockpit-isolation-v2"
         ]
       }
     },

@@ -1,0 +1,10 @@
+* text=auto
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary

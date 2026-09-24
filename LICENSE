@@ -1,0 +1,34 @@
+Cockpit Tools Isolation V4 — community-modified source
+
+Based on jlcodes99/cockpit-tools tag v1.3.59:
+https://github.com/jlcodes99/cockpit-tools/tree/v1.3.59
+Copyright remains with the respective upstream authors.
+
+The Cockpit Tools-derived material and this adaptation retain the upstream
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0) terms. Attribution, noncommercial use, and sharing adapted
+material under the same license are required. This public source release does
+not grant commercial-use rights. For commercial permission, contact the
+upstream rights holders.
+
+Legal code: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+Upstream license explanation:
+https://github.com/jlcodes99/cockpit-tools/blob/v1.3.59/README.md#许可证
+
+This edition changes the Codex account proxy, API-service routing and
+fail-closed behavior; adds encrypted proxy inventory and group failover,
+Hysteria2/TUIC and subscription import, request observability and UI controls;
+and adds Windows build and acceptance-test tooling. It is not an official
+release of the upstream project, OpenAI, Xray-core, or sing-box.
+
+Third-party components retain their separate licenses:
+- Xray-core v26.3.27: Mozilla Public License 2.0 (MPL-2.0).
+  Binary/license are downloaded by build.cmd; source:
+  https://github.com/XTLS/Xray-core/tree/v26.3.27
+- sing-box v1.14.1: GNU General Public License v3 or later, subject to its
+  additional name/non-affiliation notice. The installer carries its license,
+  GPL-3.0 text and the corresponding upstream source archive. The source
+  archive here contains src-tauri/proxy-core/sing-box-1.14.1-source.zip.
+  https://github.com/SagerNet/sing-box/tree/v1.14.1
+- CLIProxyAPI: see sidecars/cockpit-cliproxy/third_party/CLIProxyAPI/LICENSE
+  and the vendored source in the repository.

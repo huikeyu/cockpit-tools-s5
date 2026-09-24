@@ -1196,7 +1196,7 @@ async fn upsert_account_from_refresh_token(
     refresh_token: String,
     note_update: CodexAccountNoteUpdate,
 ) -> Result<CodexAccount, String> {
-    let tokens = codex_oauth::refresh_access_token(&refresh_token).await?;
+    let tokens = codex_oauth::refresh_access_token_with_pending_proxy(&refresh_token, None).await?;
     let mut account = upsert_account(tokens)?;
     save_account_note_update_if_present(&mut account, note_update)?;
     Ok(account)
@@ -2526,7 +2526,7 @@ async fn codex_batch_import_draft_from_value(
                 refresh_token,
                 note_update,
             } => {
-                let tokens = codex_oauth::refresh_access_token(&refresh_token).await?;
+                let tokens = codex_oauth::refresh_access_token_with_pending_proxy(&refresh_token, None).await?;
                 Ok(Some(CodexBatchImportDraft::FullToken {
                     tokens,
                     account_id_hint: None,

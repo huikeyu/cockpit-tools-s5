@@ -19,6 +19,21 @@ include!("codex_local_access_probe_chat.rs");
 include!("codex_pelican_transport.rs");
 include!("codex_local_access_commands.rs");
 include!("codex_local_access_http.rs");
+
+/// Proxy changes must not leave a live sidecar with an old direct/global route.
+pub async fn ensure_account_proxy_edit_safe(account_id: &str) -> Result<(), String> {
+    let runtime = gateway_runtime().lock().await;
+    if (runtime.running || runtime.collection.as_ref().is_some_and(|c| c.enabled))
+        && runtime.collection.as_ref().is_some_and(|c| effective_sidecar_account_ids(c).iter().any(|id| id == account_id)) {
+        return Err("请先停止 API 服务再修改账号代理，保存后重新启动服务".into());
+    }
+    drop(runtime);
+    let runtimes = provider_gateway_runtime_store().lock().await;
+    if runtimes.values().any(|r| r.collection.as_ref().is_some_and(|c| effective_sidecar_account_ids(c).iter().any(|id| id == account_id))) {
+        return Err("请先停止包含此账号的实例网关，再修改账号代理".into());
+    }
+    Ok(())
+}
 // The retired in-process WebSocket gateway is retained only as a test oracle.
 // Production traffic is handled by the bundled CLIProxyAPI sidecar.
 #[cfg(test)]

@@ -50,3 +50,8 @@ target/
 docs/plugin-architecture-proposal.md
 .aitasks
 .qoder/
+artifacts/
+build-logs/
+src-tauri/proxy-core/xray.exe
+src-tauri/proxy-core/sing-box.exe
+src-tauri/proxy-core/libcronet.dll

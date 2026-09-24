@@ -844,6 +844,7 @@ fn sync_shared_file(
 }
 
 pub fn ensure_instance_shared_skills(profile_dir: &Path) -> Result<(), String> {
+    if modules::account_proxy::is_isolated_profile(profile_dir) { return Ok(()); }
     let default_codex_home = get_default_codex_home()?;
     if paths_point_to_same_location(profile_dir, &default_codex_home) {
         return Ok(());
@@ -999,6 +1000,13 @@ pub fn update_instance(params: UpdateInstanceParams) -> Result<InstanceProfile, 
 
     let current_id = store.instances[index].id.clone();
     let current_dir = store.instances[index].user_data_dir.clone();
+    if let Some(ref binding) = params.bind_account_id {
+        modules::account_proxy::validate_isolated_binding(Path::new(&current_dir), binding.as_deref())?;
+    }
+    if modules::account_proxy::is_isolated_profile(Path::new(&current_dir))
+        && params.model_routing.as_ref().and_then(Option::as_ref).is_some_and(|r| r.enabled) {
+        return Err("隔离实例不支持跨账号混合路由，请使用各账号独立实例".into());
+    }
     let next_name = params
         .name
         .as_ref()

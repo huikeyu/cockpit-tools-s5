@@ -3716,8 +3716,9 @@ fn sync_provider_gateway_runtime_auth_file(
         return Ok(false);
     }
     let proxy_signature = sidecar_effective_proxy_signature(collection)?;
+    let account_proxy = crate::modules::account_proxy::effective_proxy(&account.id, proxy_signature.proxy_url.as_deref())?;
     let auth_json =
-        sidecar_auth_json_for_account(account, collection, proxy_signature.proxy_url.as_deref());
+        sidecar_auth_json_for_account(account, collection, account_proxy.as_deref());
     let auth_content = serde_json::to_string_pretty(&auth_json)
         .map_err(|error| format!("序列化实例 sidecar OAuth 认证失败: {}", error))?;
     let changed = write_string_atomic_if_changed(&auth_path, &auth_content)?;

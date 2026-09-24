@@ -1,7 +1,7 @@
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 
-if (process.platform !== 'win32') {
+if (process.platform !== 'win32' || process.env.COCKPIT_TOOLS_ISOLATION_BUILD === '1') {
   process.exit(0);
 }
 

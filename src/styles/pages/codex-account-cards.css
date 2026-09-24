@@ -14,6 +14,82 @@
   min-height: 240px;
 }
 
+@media (min-width: 1380px) {
+  .codex-account-card {
+    padding: 11px 10px;
+    gap: 8px;
+    min-height: 0;
+  }
+}
+
+/* Keep the API gateway actions visible when the first card shares a five-column row. */
+@media (min-width: 1100px) {
+  .codex-account-card.codex-local-access-card .card-footer {
+    min-width: 0;
+    overflow: visible;
+    justify-content: stretch;
+  }
+  .codex-account-card.codex-local-access-card .card-actions {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+  .codex-account-card.codex-local-access-card .card-action-btn,
+  .codex-account-card.codex-local-access-card .codex-import-api-service-guide-anchor {
+    min-width: 0;
+    width: 100%;
+  }
+  .codex-account-card.codex-local-access-card .codex-import-api-service-guide-anchor {
+    position: relative;
+  }
+}
+
+.codex-accounts-page .codex-accounts-grid .codex-account-card:has(.codex-proxy-network-card) {
+  background-image: linear-gradient(150deg, rgba(36, 177, 119, var(--codex-heat-low, 0)), transparent 70%);
+  box-shadow: var(--shadow-sm), 0 0 24px rgba(36, 177, 119, var(--codex-heat-high, 0));
+  transition: box-shadow 1.2s ease, border-color 1.2s ease, background-color 1.2s ease;
+}
+.codex-accounts-page .codex-accounts-grid .codex-account-card:has(.codex-proxy-network-card.is-running.is-heat-active),
+.codex-accounts-page .codex-accounts-grid .codex-account-card:has(.codex-proxy-network-card.is-running.is-heat-warm),
+.codex-accounts-page .codex-accounts-grid .codex-account-card:has(.codex-proxy-network-card.is-running.is-heat-hot) {
+  animation: codex-account-heat-breathe 3.8s ease-in-out infinite;
+}
+@keyframes codex-account-heat-breathe {
+  0%,100% { box-shadow: var(--shadow-sm), 0 0 16px rgba(36,177,119,var(--codex-heat-low,0)); }
+  50% { box-shadow: var(--shadow-sm), 0 0 28px rgba(36,177,119,var(--codex-heat-high,0)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .codex-accounts-page .codex-accounts-grid .codex-account-card:has(.codex-proxy-network-card) { animation: none; }
+}
+
+@media (min-width: 1380px) {
+  .codex-accounts-page .codex-accounts-grid .codex-account-card:not(.codex-local-access-card) {
+    padding: 9px 9px;
+    gap: 5px;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .card-top { gap: 5px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .account-email { font-size: 12px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-login-subline { font-size: 10px;line-height:1.2; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-quota-section { gap: 3px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-quota-mini-list { gap: 2px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-quota-mini { gap: 1px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-subscription-footer { padding: 5px 7px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .codex-card-bottom {
+    display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:0;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .card-date { flex:0 0 auto;font-size:9px; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .card-footer {
+    flex:1;min-width:0;justify-content:flex-end;padding-top:0;border-top:0;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .card-actions { gap:3px;flex-wrap:nowrap; }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card .card-action-btn {
+    flex-basis:26px;width:26px;height:26px;
+  }
+}
+
 .codex-account-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
@@ -2934,5 +3010,37 @@
 
   .codex-custom-sort-account-title {
     flex-wrap: wrap;
+  }
+}
+@media (min-width: 1380px) {
+  .codex-accounts-page .codex-accounts-grid .codex-account-card.codex-local-access-card .codex-card-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+    width: 100%;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card.codex-local-access-card .card-footer {
+    grid-column: 1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    overflow: visible;
+    justify-content: stretch;
+    padding-top: 4px;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card.codex-local-access-card .card-actions {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    gap: 3px;
+    overflow: visible;
+  }
+  .codex-accounts-page .codex-accounts-grid .codex-account-card.codex-local-access-card .card-action-btn,
+  .codex-accounts-page .codex-accounts-grid .codex-account-card.codex-local-access-card .codex-import-api-service-guide-anchor {
+    width: 100%;
+    min-width: 0;
+    height: 26px;
   }
 }

@@ -4,6 +4,9 @@ import { isCodexGroupQuotaRefreshInherit, resolveCodexGroupQuotaAutoRefreshMinut
 import { isCodexApiKeyAccount, isCodexAgentIdentityAccount, isCodexChatCompletionsApiKeyAccount, isCodexNewApiAccount } from "../types/codex";
 import { isVerboseCodexQuotaErrorMessage, summarizeCodexQuotaErrorMessage } from "../utils/codexQuotaError";
 import { CodexQuotaMiniRows } from "../components/codex/CodexQuotaMiniRows";
+import { CodexAccountProxyButton } from "../components/codex/CodexAccountProxyButton";
+import { CodexAccountNetworkPanel } from "../components/codex/CodexAccountNetworkPanel";
+import { CodexApiServiceProxySummary } from "../components/codex/CodexApiServiceProxySummary";
 import { CodexTeamQuotaHistory } from "../components/codex/CodexTeamQuotaHistory";
 import { isCodexClientReauthNoticeOnly, isCodexRefreshTokenNoticeOnly, isCodexRefreshTokenReusedAccount, isCodexServerRevokedReauth } from "../utils/codexSwitchAuthFailure";
 import { CODEX_LAUNCH_PREVIEW_API_SERVICE_CARD_KEY } from "../utils/codexLaunchPreviewInstancePreference";
@@ -1061,6 +1064,12 @@ export function useCodexAccountsRenderers(context: Pick<ReturnType<typeof useCod
                 )}
               </div>
             )}
+            <CodexAccountNetworkPanel
+              account={account}
+              inApiService={isInLocalAccess}
+              apiServiceRunning={localAccessState?.running ?? false}
+              apiServicePort={localAccessCollection?.port ?? null}
+            />
             <div className="codex-card-bottom">
               <span className="card-date">{formatDate(account.created_at)}</span>
               <div className="card-footer">
@@ -1549,6 +1558,15 @@ export function useCodexAccountsRenderers(context: Pick<ReturnType<typeof useCod
                   </div>
                 )}
               </div>
+
+              <CodexApiServiceProxySummary
+                accountIds={[
+                  ...(localAccessCollection?.accountIds ?? []),
+                  ...(localAccessCollection?.apiKeys ?? []).flatMap((key) => key.accountIds ?? []),
+                ]}
+                running={localAccessState?.running ?? false}
+                port={localAccessCollection?.port ?? null}
+              />
   
               {localAccessQuotaPreviewItems.length > 0 && (
                 <div
@@ -2570,6 +2588,7 @@ export function useCodexAccountsRenderers(context: Pick<ReturnType<typeof useCod
                 >
                   <Trash2 size={14} />
                 </button>
+                <CodexAccountProxyButton account={account} />
               </div>
             </td>
           </tr>

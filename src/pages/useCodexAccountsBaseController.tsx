@@ -979,6 +979,7 @@ export function useCodexAccountsBaseController() {
           retryOAuthBinding?: CodexOAuthBindingRetryDetail;
         },
       ) => {
+        const selectedTab = tab === "tempLogin" ? "oauth" : tab;
         setReauthTargetAccount(targetAccount ?? null);
         setReauthRetrySwitchAccountId(
           targetAccount && options?.retrySwitchAfterOAuth
@@ -1007,7 +1008,7 @@ export function useCodexAccountsBaseController() {
         setPendingOAuthFieldErrors({});
         setPendingOAuthNoteModalOpen(false);
         setPendingWebSessionImport(null);
-        openAddModal(tab);
+        openAddModal(selectedTab);
       },
       [activeGroupId, openAddModal, resolveValidCodexGroupId],
     );
@@ -1050,7 +1051,7 @@ export function useCodexAccountsBaseController() {
                 (account) => account.id === detail.targetAccountId,
               ) ?? null;
         }
-        openCodexAddModal(detail?.tab ?? "tempLogin", targetAccount, {
+        openCodexAddModal(detail?.tab ?? "oauth", targetAccount, {
           retrySwitchAfterOAuth: detail?.retrySwitchAfterOAuth,
           retrySwitchLaunchAfterSwitch: detail?.retrySwitchLaunchAfterSwitch,
           retryInstanceLaunchAfterOAuth: detail?.retryInstanceLaunchAfterOAuth,

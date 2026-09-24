@@ -295,11 +295,7 @@ fn parse_device_poll_interval(value: Option<&serde_json::Value>) -> u64 {
 }
 
 async fn request_device_user_code() -> Result<(String, String, u64), String> {
-    let client = reqwest::Client::builder()
-        .connect_timeout(TOKEN_REFRESH_TIMEOUT)
-        .timeout(TOKEN_REFRESH_TIMEOUT)
-        .build()
-        .map_err(|error| format!("创建 Codex 设备授权 HTTP 客户端失败: {}", error))?;
+    let client = crate::modules::account_proxy::pending_client(None, TOKEN_REFRESH_TIMEOUT)?;
     let response = client
         .post(DEVICE_USER_CODE_ENDPOINT)
         .header("Content-Type", "application/json")
@@ -349,11 +345,7 @@ async fn poll_device_token(
     app_handle: AppHandle,
 ) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(DEVICE_TIMEOUT_SECONDS);
-    let client = match reqwest::Client::builder()
-        .connect_timeout(TOKEN_REFRESH_TIMEOUT)
-        .timeout(TOKEN_REFRESH_TIMEOUT)
-        .build()
-    {
+    let client = match crate::modules::account_proxy::pending_client(Some(&login_id), TOKEN_REFRESH_TIMEOUT) {
         Ok(client) => client,
         Err(error) => {
             emit_device_auth_error(
@@ -492,6 +484,7 @@ pub async fn start_device_auth(
     }
     let (device_auth_id, user_code, poll_interval_seconds) = request_device_user_code().await?;
     let login_id = generate_base64url_token();
+    crate::modules::account_proxy::clone_pending_for_login(&login_id)?;
     let state = OAuthState {
         login_id: login_id.clone(),
         auth_url: DEVICE_VERIFICATION_URL.to_string(),
@@ -690,12 +683,20 @@ pub fn open_incognito_oauth_window(app: &AppHandle, auth_url: &str) -> Result<()
     }
 
     let callback_port = pending.port;
+    let proxy = crate::modules::account_proxy::pending_endpoint(Some(&pending.login_id))?;
+    crate::modules::account_proxy::lock_pending(&pending.login_id)?;
+    let browser_data_dir = crate::modules::account::get_data_dir()?
+        .join("oauth-browser")
+        .join(&pending.login_id);
     WebviewWindowBuilder::new(app, OAUTH_WINDOW_LABEL, WebviewUrl::External(parsed))
         .title("Codex OAuth")
         .inner_size(920.0, 720.0)
         .min_inner_size(640.0, 560.0)
         .center()
         .incognito(true)
+        .data_directory(browser_data_dir)
+        .additional_browser_args(&format!("--proxy-server={proxy} --proxy-bypass-list=localhost;127.0.0.1;[::1] --disable-quic"))
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
         .on_navigation(move |url| {
             if is_callback_navigation(url, callback_port) {
                 logger::log_info("Codex OAuth 无痕窗口正在访问本地回调地址");
@@ -717,6 +718,37 @@ pub fn open_incognito_oauth_window(app: &AppHandle, auth_url: &str) -> Result<()
         "Codex OAuth 无痕窗口已打开: login_id={}, port={}",
         pending.login_id, pending.port
     ));
+    Ok(())
+}
+
+pub fn open_device_verification_window(app: &AppHandle, login_id: &str) -> Result<(), String> {
+    let guard = OAUTH_STATE.lock().map_err(|_| "获取设备授权状态失败")?;
+    let pending = guard.as_ref().ok_or("设备授权会话不存在")?;
+    if pending.login_id != login_id || pending.device_auth_id.is_none() {
+        return Err("设备授权会话不匹配".into());
+    }
+    let proxy = crate::modules::account_proxy::pending_endpoint(Some(login_id))?;
+    crate::modules::account_proxy::lock_pending(login_id)?;
+    let url = Url::parse(DEVICE_VERIFICATION_URL).map_err(|_| "设备授权地址无效")?;
+    let browser_data_dir = crate::modules::account::get_data_dir()?
+        .join("oauth-browser")
+        .join(login_id);
+    drop(guard);
+    if let Some(window) = app.get_webview_window(OAUTH_WINDOW_LABEL) {
+        window.destroy().map_err(|_| "重置设备授权窗口失败")?;
+    }
+    WebviewWindowBuilder::new(app, OAUTH_WINDOW_LABEL, WebviewUrl::External(url))
+        .title("Codex 设备授权")
+        .inner_size(920.0, 720.0)
+        .min_inner_size(640.0, 560.0)
+        .center()
+        .incognito(true)
+        .data_directory(browser_data_dir)
+        .additional_browser_args(&format!("--proxy-server={proxy} --proxy-bypass-list=localhost;127.0.0.1;[::1] --disable-quic"))
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+        .on_navigation(|url| url.scheme() == "https" || url.scheme() == "about")
+        .build()
+        .map_err(|error| format!("创建设备授权代理窗口失败: {error}"))?;
     Ok(())
 }
 
@@ -745,6 +777,7 @@ fn clear_oauth_state_if_matches(expected_state: &str, expected_login_id: &str) {
     };
     if should_clear {
         set_oauth_state(None);
+        crate::modules::account_proxy::clear_pending(Some(expected_login_id));
     }
 }
 
@@ -756,6 +789,7 @@ fn clear_oauth_state_for_login_id(expected_login_id: &str) {
         .is_some_and(|state| state.login_id == expected_login_id);
     if should_clear {
         set_oauth_state(None);
+        crate::modules::account_proxy::clear_pending(Some(expected_login_id));
     }
 }
 
@@ -1054,9 +1088,10 @@ async fn exchange_code_for_token_internal(
     code_verifier: &str,
     port: u16,
     exchange_redirect_uri: Option<&str>,
+    login_id: Option<&str>,
 ) -> Result<CodexTokens, String> {
     let redirect_uri = resolve_exchange_redirect_uri(port, exchange_redirect_uri);
-    let client = reqwest::Client::new();
+    let client = crate::modules::account_proxy::pending_client(login_id, TOKEN_REFRESH_TIMEOUT)?;
 
     let params = [
         ("grant_type", "authorization_code"),
@@ -1196,6 +1231,7 @@ pub async fn complete_oauth_login(login_id: &str) -> Result<CodexTokens, String>
         &code_verifier,
         port,
         exchange_redirect_uri.as_deref(),
+        Some(login_id),
     )
     .await
     {
@@ -1235,7 +1271,7 @@ pub async fn complete_oauth_login(login_id: &str) -> Result<CodexTokens, String>
 
 pub fn cancel_oauth_flow_for(login_id: Option<&str>) -> Result<(), String> {
     hydrate_oauth_state_if_missing();
-    let port = {
+    let (port, current_login_id) = {
         let oauth_state = OAUTH_STATE.lock().unwrap();
         let Some(current) = oauth_state.as_ref() else {
             logger::log_info("Codex OAuth 取消请求已忽略：当前无活动流程");
@@ -1257,9 +1293,10 @@ pub fn cancel_oauth_flow_for(login_id: Option<&str>) -> Result<(), String> {
         }
 
         let port = current.port;
-        port
+        (port, current.login_id.clone())
     };
     set_oauth_state(None);
+    crate::modules::account_proxy::clear_pending(Some(&current_login_id));
 
     if port > 0 {
         notify_cancel(port);
@@ -1445,6 +1482,32 @@ pub async fn refresh_access_token_with_fallback(
         .timeout(TOKEN_REFRESH_TIMEOUT)
         .build()
         .map_err(|e| format!("创建 Token 刷新客户端失败: {}", e))?;
+
+    refresh_access_token_with_client(client, refresh_token, current_id_token).await
+}
+
+pub async fn refresh_access_token_for_account(
+    account_id: &str,
+    refresh_token: &str,
+    current_id_token: Option<&str>,
+) -> Result<CodexTokens, String> {
+    let client = crate::modules::account_proxy::client(account_id, TOKEN_REFRESH_TIMEOUT)?;
+    refresh_access_token_with_client(client, refresh_token, current_id_token).await
+}
+
+pub async fn refresh_access_token_with_pending_proxy(
+    refresh_token: &str,
+    current_id_token: Option<&str>,
+) -> Result<CodexTokens, String> {
+    let client = crate::modules::account_proxy::pending_client(None, TOKEN_REFRESH_TIMEOUT)?;
+    refresh_access_token_with_client(client, refresh_token, current_id_token).await
+}
+
+async fn refresh_access_token_with_client(
+    client: reqwest::Client,
+    refresh_token: &str,
+    current_id_token: Option<&str>,
+) -> Result<CodexTokens, String> {
 
     logger::log_info("Codex Token 刷新中...");
 

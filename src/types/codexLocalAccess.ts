@@ -531,3 +531,25 @@ export interface CodexInstanceGatewayView {
   logApiKeyId: string;
   lastError: string | null;
 }
+
+export type CodexTurnStateClass = "normal" | "suspected" | "abnormal" | "missing";
+export type CodexAccountTurnStateStatusKind = "unknown" | "normal" | "abnormal" | "suspected";
+export interface CodexTurnStateObservation {
+  observedAt: number;
+  source: string;
+  class: CodexTurnStateClass | string;
+  length?: number | null;
+  httpStatus?: number | null;
+  reason?: string | null;
+}
+export interface CodexAccountTurnStateStatus {
+  accountId: string;
+  status: CodexAccountTurnStateStatusKind | string;
+  suspected: boolean;
+  reason?: string | null;
+  lastClass?: string | null;
+  lastLength?: number | null;
+  lastHttpStatus?: number | null;
+  lastObservedAt: number;
+  observations: CodexTurnStateObservation[];
+}

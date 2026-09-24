@@ -1,3 +1,7 @@
+# Security Policy — Isolation V4 Community Fork
+
+Report V4-specific issues through this repository's private vulnerability-reporting channel when available. Never paste real account credentials, proxy share links, subscription URLs, or unredacted logs into public issues. The upstream security guidance follows.
+
 # Security Policy
 
 ## Supported versions

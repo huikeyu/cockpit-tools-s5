@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import "./CodexAccountDialogs.css";
@@ -359,6 +359,28 @@ export function CodexAccountsOverviewPanel(props: CodexAccountsViewProps) {
     return () => window.removeEventListener(PELICAN_GROUPS_CHANGED, reload);
   }, [reloadCodexGroups]);
   useModalScrollLock(Boolean(quickSwitchAccountId || editingApiKeyCredentialsId));
+  const [gridTemplate, setGridTemplate] = useState(() => {
+    try { const saved = localStorage.getItem("v4-codex-grid-template"); return saved && ["auto", "4", "5", "6"].includes(saved) ? saved : "5"; } catch { return "5"; }
+  });
+  const [uiScale, setUiScale] = useState(() => {
+    try { const saved = localStorage.getItem("v4-codex-ui-scale"); return saved && ["85", "90", "100", "110"].includes(saved) ? saved : "100"; } catch { return "100"; }
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    const template = gridTemplate === "auto"
+      ? "repeat(auto-fill,minmax(320px,1fr))"
+      : `repeat(${gridTemplate},minmax(0,1fr))`;
+    root.style.setProperty("--v4-codex-grid-template", template);
+    root.style.setProperty("--v4-codex-ui-scale", `${Number(uiScale) / 100}`);
+    try {
+      localStorage.setItem("v4-codex-grid-template", gridTemplate);
+      localStorage.setItem("v4-codex-ui-scale", uiScale);
+    } catch { /* keep the controls usable when storage is unavailable */ }
+    return () => {
+      root.style.removeProperty("--v4-codex-grid-template");
+      root.style.removeProperty("--v4-codex-ui-scale");
+    };
+  }, [gridTemplate, uiScale]);
   return (
         <>
           {message && (
@@ -568,6 +590,14 @@ export function CodexAccountsOverviewPanel(props: CodexAccountsViewProps) {
               )}
             </div>
             <div className="toolbar-right">
+              <div className="codex-v4-layout-controls" aria-label="V4 卡片布局">
+                <label><span>列</span><select value={gridTemplate} onChange={(event) => setGridTemplate(event.target.value)}>
+                  <option value="auto">自动</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                </select></label>
+                <label><span>缩放</span><select value={uiScale} onChange={(event) => setUiScale(event.target.value)}>
+                  <option value="85">85%</option><option value="90">90%</option><option value="100">100%</option><option value="110">110%</option>
+                </select></label>
+              </div>
               <button
                 className="btn btn-primary icon-only"
                 onClick={() => openCodexAddModal("tempLogin")}

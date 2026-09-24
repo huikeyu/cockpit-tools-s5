@@ -9,6 +9,7 @@ import "./CodexAccountDialogs.css";
 import { CODEX_TEMP_LOGIN_STEPS } from "../services/codexTempLoginService";
 import { CODEX_API_PROVIDER_CUSTOM_ID, CODEX_API_PROVIDER_PRESETS, COCKPIT_API_PROVIDER_ID } from "../utils/codexProviderPresets";
 import type { CodexAccountsViewProps } from "./CodexAccountsView";
+import { CodexProxyInventoryPicker } from "../components/codex/CodexProxyInventoryPicker";
 
 /** 渲染 CodexAccountsOverviewPanel 的 expr:showAddModal && 业务面板。 */
 export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
@@ -43,12 +44,10 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
     handleCopyOauthUrl,
     handleCopyReauthEmail,
     handleCopyCodexTempLoginAuthUrl,
-    handleFetchApiModelCatalog,
     handleCloseLocalImportInstancePicker,
     handleImportFromFiles,
     handleImportFromLocal,
     handleCancelCodexTempLogin,
-    handleOpenCodexSecuritySettings,
     handleOpenCodexTempLoginAuthUrl,
     handleOpenDeviceAuthUrl,
     handleOpenOauthIncognitoWindow,
@@ -92,6 +91,12 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
     oauthTimeoutInfo,
     oauthUrl,
     oauthUrlCopied,
+    pendingAuthProxyError,
+    pendingAuthProxyInput,
+    pendingAuthProxyTest,
+    pendingAuthProxyTesting,
+    handleTestPendingAuthProxy,
+    setPendingAuthProxyInput,
     OPENAI_OFFICIAL_PRESET_ID,
     openCodexAddModal,
     openPendingOAuthNoteModal,
@@ -168,17 +173,12 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                       <X />
                     </button>
                   </div>
+                  <div className="codex-proxy-add-steps" aria-label="添加账号代理步骤">
+                    <span><b>1</b> 为这个账号填写节点</span>
+                    <span><b>2</b> 测试出口 IP</span>
+                    <span><b>3</b> 登录或导入账号</span>
+                  </div>
                   <div className="modal-tabs">
-                    <button
-                      className={`modal-tab ${addTab === "tempLogin" ? "active" : ""}`}
-                      onClick={() => openCodexAddModal("tempLogin")}
-                      disabled={importing || tempLoginRunning}
-                    >
-                      <Monitor size={14} />
-                      <span className="modal-tab-label">
-                        {t("codex.tempLogin.tab", "官方登录")}
-                      </span>
-                    </button>
                     <button
                       className={`modal-tab ${addTab === "oauth" ? "active" : ""}`}
                       onClick={() => openCodexAddModal("oauth")}
@@ -188,7 +188,7 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                       <span className="modal-tab-label">
                         {t(
                           "common.shared.addModal.oauth",
-                          "OAuth Authorization",
+                          "代理网页登录",
                         )}
                       </span>
                     </button>
@@ -531,6 +531,24 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                             "通过 OpenAI 官方 OAuth 授权您的 Codex 账号。",
                           )}
                         </p>
+                        <div className="codex-pending-auth-proxy">
+                          <label htmlFor="codex-pending-auth-proxy-oauth">添加账号代理（必填）</label>
+                          <input
+                            id="codex-pending-auth-proxy-oauth"
+                            type="password"
+                            value={pendingAuthProxyInput}
+                            onChange={(event) => setPendingAuthProxyInput(event.target.value)}
+                            placeholder="vless://... / http://... / socks5://..."
+                            disabled={oauthCompletingRef.current || deviceAuthStarting}
+                          />
+                          <CodexProxyInventoryPicker onSelect={setPendingAuthProxyInput} />
+                          <small>浏览器登录、回调换 token、设备授权都使用此代理；未设置时禁止继续，避免原始 IP 直连。</small>
+                          <button type="button" className="btn btn-secondary" onClick={() => void handleTestPendingAuthProxy()} disabled={!pendingAuthProxyInput.trim() || pendingAuthProxyTesting}>
+                            {pendingAuthProxyTesting ? "正在检测…" : "先测试代理出口"}
+                          </button>
+                          {pendingAuthProxyTest && <span className="add-status success">{pendingAuthProxyTest}</span>}
+                          {pendingAuthProxyError && <span className="add-status error">{pendingAuthProxyError}</span>}
+                        </div>
                         <div
                           className="codex-oauth-method-switch"
                           role="tablist"
@@ -584,17 +602,6 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                                 "如果提示未启用设备代码授权，请先在 ChatGPT 安全设置中为 Codex 开启设备代码授权。",
                               )}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleOpenCodexSecuritySettings()
-                              }
-                            >
-                              {t(
-                                "common.shared.oauth.openSecuritySettings",
-                                "打开设置",
-                              )}
-                            </button>
                           </div>
                         )}
                         {deviceAuthError && (
@@ -747,7 +754,7 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                                     )
                                   : t(
                                       "common.shared.oauth.openBrowser",
-                                      "Open in Browser",
+                                      "在独立代理窗口授权",
                                     )}
                               </button>
                               {!isOauthTimeoutState && isMacOS && (
@@ -854,6 +861,20 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                     )}
                     {addTab === "apikey" && (
                       <div className="add-section">
+                        <div className="codex-pending-auth-proxy">
+                          <label htmlFor="codex-pending-auth-proxy-apikey">此账号独立代理（必填）</label>
+                          <input id="codex-pending-auth-proxy-apikey" type="password"
+                            value={pendingAuthProxyInput}
+                            onChange={(event) => setPendingAuthProxyInput(event.target.value)}
+                            placeholder="vless://... / http://... / socks5://..." />
+                          <CodexProxyInventoryPicker onSelect={setPendingAuthProxyInput} />
+                          <small>账号保存后才会访问供应商网络；请手动填写模型列表。</small>
+                          <button type="button" className="btn btn-secondary" onClick={() => void handleTestPendingAuthProxy()} disabled={!pendingAuthProxyInput.trim() || pendingAuthProxyTesting}>
+                            {pendingAuthProxyTesting ? "正在检测…" : "先测试代理出口"}
+                          </button>
+                          {pendingAuthProxyTest && <span className="add-status success">{pendingAuthProxyTest}</span>}
+                          {pendingAuthProxyError && <span className="add-status error">{pendingAuthProxyError}</span>}
+                        </div>
                         <div className="oauth-link">
                           <label>
                             {t(
@@ -1236,14 +1257,8 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                                 <button
                                   type="button"
                                   className="btn btn-secondary api-model-catalog-fetch"
-                                  onClick={() =>
-                                    void handleFetchApiModelCatalog()
-                                  }
-                                  disabled={
-                                    apiModelCatalogFetching ||
-                                    addStatus === "loading" ||
-                                    !apiKeyInput.trim()
-                                  }
+                                  disabled
+                                  title="添加前无法确定账号代理；保存账号后再获取模型"
                                 >
                                   <RefreshCw
                                     size={14}
@@ -1369,6 +1384,24 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                             '示例：session JSON、accessToken、at-… 个人访问令牌、Sub2API JSON，或 {"personal_access_token":"at-..."}',
                           )}
                         />
+                        <div className="codex-pending-auth-proxy">
+                          <label htmlFor="codex-pending-auth-proxy-token">添加账号代理（必填）</label>
+                          <input
+                            id="codex-pending-auth-proxy-token"
+                            type="password"
+                            value={pendingAuthProxyInput}
+                            onChange={(event) => setPendingAuthProxyInput(event.target.value)}
+                            placeholder="vless://... / http://... / socks5://..."
+                            disabled={importing}
+                          />
+                          <CodexProxyInventoryPicker onSelect={setPendingAuthProxyInput} />
+                          <small>refresh_token 导入和首次账号检查会通过该代理；保存后账号 API 请求继续使用同一代理。</small>
+                          <button type="button" className="btn btn-secondary" onClick={() => void handleTestPendingAuthProxy()} disabled={!pendingAuthProxyInput.trim() || pendingAuthProxyTesting}>
+                            {pendingAuthProxyTesting ? "正在检测…" : "先测试代理出口"}
+                          </button>
+                          {pendingAuthProxyTest && <span className="add-status success">{pendingAuthProxyTest}</span>}
+                          {pendingAuthProxyError && <span className="add-status error">{pendingAuthProxyError}</span>}
+                        </div>
                         <label className="codex-import-api-service-toggle">
                           <span className="codex-import-api-service-toggle-copy">
                             <strong>
@@ -1414,6 +1447,20 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                     )}
                     {addTab === "import" && (
                       <div className="add-section">
+                        <div className="codex-pending-auth-proxy">
+                          <label htmlFor="codex-pending-auth-proxy-local">此账号独立代理（必填）</label>
+                          <input id="codex-pending-auth-proxy-local" type="password"
+                            value={pendingAuthProxyInput}
+                            onChange={(event) => setPendingAuthProxyInput(event.target.value)}
+                            placeholder="vless://... / http://... / socks5://..." />
+                          <CodexProxyInventoryPicker onSelect={setPendingAuthProxyInput} />
+                          <small>从本机凭据导入后，首次账号查询使用该代理。</small>
+                          <button type="button" className="btn btn-secondary" onClick={() => void handleTestPendingAuthProxy()} disabled={!pendingAuthProxyInput.trim() || pendingAuthProxyTesting}>
+                            {pendingAuthProxyTesting ? "正在检测…" : "先测试代理出口"}
+                          </button>
+                          {pendingAuthProxyTest && <span className="add-status success">{pendingAuthProxyTest}</span>}
+                          {pendingAuthProxyError && <span className="add-status error">{pendingAuthProxyError}</span>}
+                        </div>
                         <p className="section-desc">
                           {t(
                             "codex.import.localDesc",
@@ -1466,7 +1513,8 @@ export function CodexAddAccountDialog(props: CodexAccountsViewProps) {
                         <button
                           className="btn btn-secondary btn-full"
                           onClick={handleImportFromFiles}
-                          disabled={importing}
+                          disabled
+                          title="请改用 Token/JSON 单账号导入，以便逐账号设置代理"
                         >
                           {importing ? (
                             <RefreshCw size={16} className="loading-spinner" />

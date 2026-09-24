@@ -1,3 +1,7 @@
+# Contributing to Cockpit Tools Isolation V4
+
+This is a community modification of [jlcodes99/cockpit-tools](https://github.com/jlcodes99/cockpit-tools). For V4-specific proxy, subscription, or UI changes, open an issue or pull request in [huikeyu/cockpit-tools-s5](https://github.com/huikeyu/cockpit-tools-s5). Do not publish real proxy links, subscription URLs, account tokens, personal paths, or unredacted logs. The upstream contribution guide follows.
+
 # Contributing to Cockpit Tools
 
 Thank you for your interest in contributing to Cockpit Tools! This project aims to be the universal manager for AI IDEs, and we welcome contributions of all kinds.

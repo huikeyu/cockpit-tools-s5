@@ -759,7 +759,7 @@ function MainApp() {
       }
       localStorage.removeItem(ACTIVE_PAGE_STORAGE_KEY);
     } catch {}
-    return 'dashboard';
+    return 'codex';
   });
   const isCodexSuitePage = page === 'codex' || page === 'codex-api-service';
   const [codexSuiteKeepAlive, setCodexSuiteKeepAlive] = useState(isCodexSuitePage);
@@ -1525,6 +1525,9 @@ function MainApp() {
   }, [updateRuntimeInfo]);
 
   const runUpdaterCheck = useCallback(async () => {
+    if (import.meta.env.VITE_COCKPIT_ISOLATION === '1') {
+      throw new Error('隔离定制版请使用对应版本文件夹的一键编译更新，不能安装上游更新覆盖隔离功能。');
+    }
     const { check } = await import('@tauri-apps/plugin-updater');
     const target = getUpdaterCheckTarget();
     return target ? check({ target }) : check();
@@ -2312,6 +2315,7 @@ function MainApp() {
 
   // Check for updates on startup
   useEffect(() => {
+    if (import.meta.env.VITE_COCKPIT_ISOLATION === '1') return;
     if (!updateRuntimeInfoLoaded) {
       return;
     }
